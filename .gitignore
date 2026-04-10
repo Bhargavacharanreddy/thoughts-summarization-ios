@@ -2,6 +2,7 @@
 *.xcuserstate
 *.xcworkspace/contents.xcworkspacedata
 xcuserdata/
+*.xcschememanagement.plist
 *.moved-aside
 *.pbxuser
 !default.pbxuser
