@@ -1,11 +1,5 @@
-//
-//  summaryApp.swift
-//  summary
-//
-//  Created by charan on 3/29/26.
-//
-
 import SwiftUI
+import SwiftData
 
 @main
 struct summaryApp: App {
@@ -13,5 +7,6 @@ struct summaryApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Thought.self, ThoughtCategory.self, DailySummary.self])
     }
 }
