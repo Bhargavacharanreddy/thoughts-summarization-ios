@@ -8,11 +8,13 @@ class ThoughtsViewModel {
     var categories: [ThoughtCategory] = []
     var dailySummary: DailySummary?
     var historicalSummaries: [DailySummary] = []
+    var todos: [TodoItem] = []
 
     var isCategorizingThoughts = false
     var isGeneratingSummary = false
     var isGeneratingImage = false
     var isCleaningTranscript = false
+    var isGeneratingTodos = false
     var errorMessage: String?
 
     private let modelContext: ModelContext
@@ -23,6 +25,7 @@ class ThoughtsViewModel {
         self.modelContext = modelContext
         self.settings = settings
         loadTodaysData()
+        loadTodos()
     }
 
     // MARK: - Adding Thoughts
@@ -43,8 +46,6 @@ class ThoughtsViewModel {
         try? modelContext.save()
     }
 
-    /// Cleans up a voice transcript using the active AI service (or Whisper if OpenAI),
-    /// then saves it as a thought. Shows `isCleaningTranscript` during the process.
     func cleanAndAddVoiceThought(transcript: String, audioFileURL: URL?) async {
         let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -61,13 +62,11 @@ class ThoughtsViewModel {
             if settings.selectedProvider == .openAI,
                let url = audioFileURL,
                let openAI = service as? OpenAIService {
-                // Whisper gives better quality for OpenAI users
                 if let whisperText = try? await openAI.transcribeAudio(fileURL: url),
                    !whisperText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     finalTranscript = whisperText
                 }
             } else {
-                // AI cleanup: removes filler words and fixes grammar
                 if let cleaned = try? await service.cleanTranscript(trimmed),
                    !cleaned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     finalTranscript = cleaned
@@ -75,13 +74,11 @@ class ThoughtsViewModel {
             }
         }
 
-        // Clean up the audio file regardless
         if let url = audioFileURL { try? FileManager.default.removeItem(at: url) }
-
         addThought(finalTranscript, inputType: .voice)
     }
 
-    // MARK: - AI Actions
+    // MARK: - AI: Categorize + Todos
 
     func categorize() async {
         guard let service = settings.makeAIService() else {
@@ -97,10 +94,33 @@ class ThoughtsViewModel {
         do {
             let results = try await service.categorize(thoughts: contents)
             updateCategories(from: results)
+            // After categorizing, generate todos from the same thoughts
+            await generateTodos(service: service, thoughts: contents)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
+
+    private func generateTodos(service: any AIService, thoughts: [String]) async {
+        isGeneratingTodos = true
+        defer { isGeneratingTodos = false }
+
+        let categoryNames = categories.map { $0.name }
+        do {
+            let results = try await service.generateTodos(thoughts: thoughts, categories: categoryNames)
+            for result in results {
+                let quadrant = EisenhowerQuadrant(rawValue: result.quadrant) ?? .notUrgentNotImportant
+                let item = TodoItem(title: result.title, notes: result.notes, quadrant: quadrant)
+                modelContext.insert(item)
+                todos.append(item)
+            }
+            try? modelContext.save()
+        } catch {
+            // Todo generation is best-effort — don't surface this error to the user
+        }
+    }
+
+    // MARK: - AI: Summary + Image
 
     func generateDailySummary() async {
         guard let service = settings.makeAIService() else {
@@ -126,13 +146,11 @@ class ThoughtsViewModel {
         }
     }
 
-    /// Generate (or regenerate) the image for today's summary.
     func generateImageForCurrentSummary() async {
         guard let summary = dailySummary else { return }
         await generateImage(for: summary)
     }
 
-    /// Generate (or regenerate) the image for any summary — today or historical.
     func generateImage(for summary: DailySummary) async {
         guard let service = settings.makeAIService() else {
             errorMessage = AIError.noAPIKey.errorDescription
@@ -167,6 +185,33 @@ class ThoughtsViewModel {
             errorMessage = error.localizedDescription
             return nil
         }
+    }
+
+    // MARK: - Todo CRUD
+
+    func toggleTodoDone(_ todo: TodoItem) {
+        todo.isDone.toggle()
+        try? modelContext.save()
+    }
+
+    func updateTodo(_ todo: TodoItem, title: String, notes: String, quadrant: EisenhowerQuadrant) {
+        todo.title = title
+        todo.notes = notes
+        todo.quadrant = quadrant
+        try? modelContext.save()
+    }
+
+    func deleteTodo(_ todo: TodoItem) {
+        todos.removeAll { $0.id == todo.id }
+        modelContext.delete(todo)
+        try? modelContext.save()
+    }
+
+    func loadTodos() {
+        let desc = FetchDescriptor<TodoItem>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        todos = (try? modelContext.fetch(desc)) ?? []
     }
 
     // MARK: - History

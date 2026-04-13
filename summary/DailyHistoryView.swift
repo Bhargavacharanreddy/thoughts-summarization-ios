@@ -6,7 +6,7 @@ struct DailyHistoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                background
+                SpaceBackground()
                 Group {
                     if viewModel.historicalSummaries.isEmpty {
                         emptyState
@@ -24,21 +24,6 @@ struct DailyHistoryView: View {
         .onAppear { viewModel.loadHistoricalSummaries() }
     }
 
-    // MARK: - Background
-
-    private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.05, green: 0.03, blue: 0.13),
-                Color(red: 0.11, green: 0.05, blue: 0.21),
-                Color(red: 0.05, green: 0.04, blue: 0.17)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
-
     // MARK: - Empty State
 
     private var emptyState: some View {
@@ -48,7 +33,7 @@ struct DailyHistoryView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.purple.opacity(0.55), .indigo.opacity(0.3)],
+                        colors: [.nebula.opacity(0.55), .indigo.opacity(0.3)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -99,10 +84,10 @@ struct HistorySummaryCard: View {
                         .scaledToFill()
                 } else {
                     ZStack {
-                        Color.purple.opacity(0.12)
+                        Color.nebula.opacity(0.12)
                         Image(systemName: "brain.head.profile")
                             .font(.system(size: 28))
-                            .foregroundStyle(.purple.opacity(0.4))
+                            .foregroundStyle(.nebula.opacity(0.4))
                     }
                 }
             }
@@ -112,7 +97,7 @@ struct HistorySummaryCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.purple.opacity(0.8))
+                    .foregroundStyle(.nebula.opacity(0.8))
                     .textCase(.uppercase)
                     .tracking(0.5)
 
@@ -161,19 +146,12 @@ struct HistoryDetailView: View {
     let summary: DailySummary
     @Environment(ThoughtsViewModel.self) private var viewModel
     @State private var thoughts: [Thought] = []
+    @State private var zoomedImage: UIImage?
+    @State private var showImageZoom = false
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.05, green: 0.03, blue: 0.13),
-                    Color(red: 0.11, green: 0.05, blue: 0.21),
-                    Color(red: 0.05, green: 0.04, blue: 0.17)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            SpaceBackground()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -213,7 +191,7 @@ struct HistoryDetailView: View {
                         ForEach(thoughts) { thought in
                             HStack(alignment: .top, spacing: 10) {
                                 Circle()
-                                    .fill(thought.inputType == .voice ? Color.purple.opacity(0.5) : Color.cyan.opacity(0.5))
+                                    .fill(thought.inputType == .voice ? Color.nebula.opacity(0.5) : Color.cyan.opacity(0.5))
                                     .frame(width: 6, height: 6)
                                     .padding(.top, 6)
                                 Text(thought.content)
@@ -231,9 +209,15 @@ struct HistoryDetailView: View {
         .navigationTitle(summary.date.formatted(.dateTime.month(.wide).day().year()))
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .preferredColorScheme(.dark)
         .onAppear {
             thoughts = viewModel.loadThoughts(for: summary.date)
+        }
+        .fullScreenCover(isPresented: $showImageZoom) {
+            if let img = zoomedImage {
+                ImageZoomViewer(image: img)
+            }
         }
     }
 
@@ -242,16 +226,23 @@ struct HistoryDetailView: View {
         if let data = summary.imageData, let uiImage = UIImage(data: data) {
             // Image exists
             VStack(spacing: 10) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                    )
+                Button {
+                    zoomedImage = uiImage
+                    showImageZoom = true
+                } label: {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+
                 Button {
                     Task { await viewModel.generateImage(for: summary) }
                 } label: {
@@ -268,7 +259,7 @@ struct HistoryDetailView: View {
                 .frame(height: 180)
                 .overlay(
                     VStack(spacing: 12) {
-                        ProgressView().tint(.purple)
+                        ProgressView().tint(.nebula)
                         Text("Generating image…")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.4))
@@ -276,7 +267,7 @@ struct HistoryDetailView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.purple.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(.nebula.opacity(0.2), lineWidth: 1)
                 )
         } else {
             // No image — show generate button
@@ -290,7 +281,7 @@ struct HistoryDetailView: View {
                             .frame(width: 52, height: 52)
                         Image(systemName: "photo.badge.plus")
                             .font(.system(size: 22))
-                            .foregroundStyle(.purple.opacity(0.8))
+                            .foregroundStyle(.nebula.opacity(0.8))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Generate Image")
@@ -311,7 +302,7 @@ struct HistoryDetailView: View {
                         .fill(.white.opacity(0.055))
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(.purple.opacity(0.3), lineWidth: 1)
+                                .strokeBorder(.nebula.opacity(0.3), lineWidth: 1)
                         )
                 )
             }

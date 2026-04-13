@@ -6,6 +6,52 @@ enum InputType: String, Codable {
     case text
 }
 
+enum EisenhowerQuadrant: String, Codable, CaseIterable, Identifiable {
+    case urgentImportant       = "urgentImportant"
+    case notUrgentImportant    = "notUrgentImportant"
+    case urgentNotImportant    = "urgentNotImportant"
+    case notUrgentNotImportant = "notUrgentNotImportant"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .urgentImportant:       return "Do First"
+        case .notUrgentImportant:    return "Schedule"
+        case .urgentNotImportant:    return "Delegate"
+        case .notUrgentNotImportant: return "Eliminate"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .urgentImportant:       return "Urgent & Important"
+        case .notUrgentImportant:    return "Not Urgent, Important"
+        case .urgentNotImportant:    return "Urgent, Not Important"
+        case .notUrgentNotImportant: return "Not Urgent, Not Important"
+        }
+    }
+}
+
+@Model
+final class TodoItem {
+    var id: UUID
+    var title: String
+    var notes: String
+    var quadrant: EisenhowerQuadrant
+    var isDone: Bool
+    var createdAt: Date
+
+    init(title: String, notes: String = "", quadrant: EisenhowerQuadrant) {
+        self.id = UUID()
+        self.title = title
+        self.notes = notes
+        self.quadrant = quadrant
+        self.isDone = false
+        self.createdAt = Date()
+    }
+}
+
 @Model
 final class Thought {
     var id: UUID

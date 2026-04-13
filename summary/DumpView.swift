@@ -11,7 +11,7 @@ struct DumpView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                background
+                SpaceBackground()
                 VStack(spacing: 0) {
                     inputSection
                     separator
@@ -36,21 +36,6 @@ struct DumpView: View {
         .onAppear {
             speechRecognizer.onAutoStop = { stopAndSaveVoice() }
         }
-    }
-
-    // MARK: - Background
-
-    private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.05, green: 0.03, blue: 0.13),
-                Color(red: 0.11, green: 0.05, blue: 0.21),
-                Color(red: 0.05, green: 0.04, blue: 0.17)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
     }
 
     // MARK: - Input Section
@@ -110,7 +95,7 @@ struct DumpView: View {
                 TextField("What's on your mind?", text: $inputText, axis: .vertical)
                     .lineLimit(3...6)
                     .foregroundStyle(.white)
-                    .tint(.purple)
+                    .tint(.nebula)
                     .font(.body)
                     .padding(16)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -143,8 +128,8 @@ struct DumpView: View {
                 GradientButton(
                     label: "Add Thought",
                     icon: "plus.circle.fill",
-                    colors: [Color(red: 0.55, green: 0.22, blue: 0.92), Color(red: 0.32, green: 0.18, blue: 0.78)],
-                    shadowColor: .purple,
+                    colors: [Color.nebula, Color(red: 0.32, green: 0.18, blue: 0.78)],
+                    shadowColor: .nebula,
                     action: submitText
                 )
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -207,7 +192,7 @@ struct DumpView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.purple.opacity(0.55), .indigo.opacity(0.3)],
+                        colors: [.nebula.opacity(0.55), .cosmicBlue.opacity(0.5)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -278,13 +263,13 @@ struct MicButton: View {
                                     startPoint: .topLeading, endPoint: .bottomTrailing
                                 )
                                 : LinearGradient(
-                                    colors: [Color(red: 0.55, green: 0.22, blue: 0.92), Color(red: 0.32, green: 0.15, blue: 0.76)],
+                                    colors: [Color.nebula, Color(red: 0.32, green: 0.15, blue: 0.76)],
                                     startPoint: .topLeading, endPoint: .bottomTrailing
                                 )
                         )
                         .frame(width: 56, height: 56)
                         .shadow(
-                            color: isRecording ? .red.opacity(0.55) : .purple.opacity(0.45),
+                            color: isRecording ? .red.opacity(0.55) : .nebula.opacity(0.45),
                             radius: isRecording ? 16 : 8,
                             y: 4
                         )
@@ -420,10 +405,10 @@ struct CleaningCard: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.purple.opacity(0.15))
+                    .fill(Color.nebula.opacity(0.15))
                     .frame(width: 40, height: 40)
                 ProgressView()
-                    .tint(.purple)
+                    .tint(.nebula)
                     .scaleEffect(0.8)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -432,7 +417,7 @@ struct CleaningCard: View {
                     .font(.body)
                 Text("AI is cleaning up your transcription")
                     .font(.caption2)
-                    .foregroundStyle(.purple.opacity(0.7))
+                    .foregroundStyle(.nebula.opacity(0.7))
             }
             Spacer(minLength: 0)
         }
@@ -442,7 +427,7 @@ struct CleaningCard: View {
                 .fill(.white.opacity(0.055))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Color.purple.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(Color.nebula.opacity(0.3), lineWidth: 1)
                 )
         )
         .onReceive(timer) { _ in
@@ -460,7 +445,7 @@ struct ThoughtCard: View {
     @State private var appeared = false
 
     private var isVoice: Bool { thought.inputType == .voice }
-    private var accent: Color { isVoice ? .purple : .cyan }
+    private var accent: Color { isVoice ? .nebula : .auroraTeal }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {

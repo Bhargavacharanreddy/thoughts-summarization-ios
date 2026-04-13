@@ -17,8 +17,12 @@ struct ContentView: View {
                         .tabItem { Label("Summary", systemImage: "doc.text") }
                     DailyHistoryView()
                         .tabItem { Label("History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") }
+                    TasksView()
+                        .tabItem { Label("Tasks", systemImage: "checklist") }
                 }
                 .environment(viewModel)
+                .toolbarBackground(Color.spaceBg.opacity(0.95), for: .tabBar)
+                .toolbarColorScheme(.dark, for: .tabBar)
                 .alert("Error", isPresented: Binding(
                     get: { viewModel.errorMessage != nil },
                     set: { if !$0 { viewModel.errorMessage = nil } }
@@ -41,5 +45,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Thought.self, ThoughtCategory.self, DailySummary.self], inMemory: true)
+        .modelContainer(for: [Thought.self, ThoughtCategory.self, DailySummary.self, TodoItem.self], inMemory: true)
 }

@@ -5,6 +5,12 @@ struct CategoryResult {
     let thoughtIndices: [Int]
 }
 
+struct TodoResult {
+    let title: String
+    let notes: String
+    let quadrant: String  // matches EisenhowerQuadrant raw values
+}
+
 protocol AIService {
     var name: String { get }
     func categorize(thoughts: [String]) async throws -> [CategoryResult]
@@ -12,11 +18,13 @@ protocol AIService {
     func dailySummary(thoughts: [String]) async throws -> String
     func cleanTranscript(_ text: String) async throws -> String
     func generateSummaryImage(summary: String) async throws -> Data?
+    func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult]
 }
 
 extension AIService {
     func cleanTranscript(_ text: String) async throws -> String { text }
     func generateSummaryImage(summary: String) async throws -> Data? { nil }
+    func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] { [] }
 }
 
 enum AIError: Error, LocalizedError {
@@ -33,36 +41,22 @@ enum AIError: Error, LocalizedError {
     }
 }
 
-// Shared JSON parser for OpenAI/Claude category responses
-func parseCategoryJSON(_ json: String, thoughtCount: Int) throws -> [CategoryResult] {
-    // Strip markdown code fences if present (```json ... ```)
-    var cleaned = json.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let fenceStart = cleaned.range(of: "```"),
-       let fenceEnd = cleaned.range(of: "```", options: .backwards),
-       fenceStart.lowerBound != fenceEnd.lowerBound {
-        cleaned = String(cleaned[fenceStart.upperBound..<fenceEnd.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        // Strip optional "json" language tag on the opening fence
-        if cleaned.hasPrefix("json") { cleaned = String(cleaned.dropFirst(4)) }
-        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+// MARK: - Category JSON parser
 
-    // Find the JSON array by locating [{ ... }] — more reliable than bare [ ]
-    // because model prose may contain brackets (e.g. "your [thoughts]")
+func parseCategoryJSON(_ json: String, thoughtCount: Int) throws -> [CategoryResult] {
+    var cleaned = stripFences(json)
+
     guard let startRange = cleaned.range(of: "[{"),
           let endRange = cleaned.range(of: "}]", options: .backwards) else {
-        // Fallback: try bare [ ]
         guard let s = cleaned.firstIndex(of: "["),
               let e = cleaned.lastIndex(of: "]") else { throw AIError.parseError }
-        return try parseArray(String(cleaned[s...e]), thoughtCount: thoughtCount)
+        return try parseCategoryArray(String(cleaned[s...e]), thoughtCount: thoughtCount)
     }
-
-    // Use half-open range (..<) so upperBound == endIndex doesn't crash
     let jsonStr = String(cleaned[startRange.lowerBound..<endRange.upperBound])
-    return try parseArray(jsonStr, thoughtCount: thoughtCount)
+    return try parseCategoryArray(jsonStr, thoughtCount: thoughtCount)
 }
 
-private func parseArray(_ jsonStr: String, thoughtCount: Int) throws -> [CategoryResult] {
+private func parseCategoryArray(_ jsonStr: String, thoughtCount: Int) throws -> [CategoryResult] {
     guard let data = jsonStr.data(using: .utf8),
           let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
         throw AIError.parseError
@@ -78,4 +72,47 @@ private func parseArray(_ jsonStr: String, thoughtCount: Int) throws -> [Categor
         let valid = indices.filter { $0 >= 0 && $0 < thoughtCount }
         return CategoryResult(name: name, thoughtIndices: valid)
     }
+}
+
+// MARK: - Todo JSON parser
+
+func parseTodoJSON(_ json: String) throws -> [TodoResult] {
+    var cleaned = stripFences(json)
+
+    guard let startRange = cleaned.range(of: "[{"),
+          let endRange = cleaned.range(of: "}]", options: .backwards) else {
+        guard let s = cleaned.firstIndex(of: "["),
+              let e = cleaned.lastIndex(of: "]") else { throw AIError.parseError }
+        return try parseTodoArray(String(cleaned[s...e]))
+    }
+    let jsonStr = String(cleaned[startRange.lowerBound..<endRange.upperBound])
+    return try parseTodoArray(jsonStr)
+}
+
+private func parseTodoArray(_ jsonStr: String) throws -> [TodoResult] {
+    guard let data = jsonStr.data(using: .utf8),
+          let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+        throw AIError.parseError
+    }
+    return array.compactMap { dict -> TodoResult? in
+        guard let title = dict["title"] as? String, !title.isEmpty else { return nil }
+        let notes = dict["notes"] as? String ?? ""
+        let quadrant = dict["quadrant"] as? String ?? "notUrgentNotImportant"
+        return TodoResult(title: title, notes: notes, quadrant: quadrant)
+    }
+}
+
+// MARK: - Shared helpers
+
+private func stripFences(_ json: String) -> String {
+    var cleaned = json.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let fenceStart = cleaned.range(of: "```"),
+       let fenceEnd = cleaned.range(of: "```", options: .backwards),
+       fenceStart.lowerBound != fenceEnd.lowerBound {
+        cleaned = String(cleaned[fenceStart.upperBound..<fenceEnd.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("json") { cleaned = String(cleaned.dropFirst(4)) }
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    return cleaned
 }

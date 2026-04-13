@@ -14,6 +14,22 @@ struct CategoryItem {
     var indices: [Int]
 }
 
+@Generable
+struct TodoOutput {
+    @Guide(description: "List of actionable todo items derived from the thoughts")
+    var todos: [TodoItemGenerable]
+}
+
+@Generable
+struct TodoItemGenerable {
+    @Guide(description: "Short, actionable task title")
+    var title: String
+    @Guide(description: "Optional additional context or detail (empty string if none)")
+    var notes: String
+    @Guide(description: "Eisenhower quadrant: urgentImportant, notUrgentImportant, urgentNotImportant, or notUrgentNotImportant")
+    var quadrant: String
+}
+
 @available(iOS 26, *)
 class AppleIntelligenceService: AIService {
     let name = "Apple Intelligence"
@@ -61,5 +77,22 @@ class AppleIntelligenceService: AIService {
         let prompt = "Clean up this voice-to-text transcription. Remove filler words (um, uh, like, you know, so), fix grammar, and make it clear and concise while preserving the original meaning. Return only the cleaned text with no explanation or preamble.\n\nTranscription: \(text)"
         let response = try await session.respond(to: prompt)
         return response.content
+    }
+
+    func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] {
+        let session = LanguageModelSession()
+        let numbered = thoughts.enumerated()
+            .map { "\($0.offset). \($0.element)" }.joined(separator: "\n")
+        let prompt = """
+        Based on these thoughts and their categories, generate an actionable todo list.
+        Categories: \(categories.joined(separator: ", "))
+        Thoughts:
+        \(numbered)
+        Generate 3–8 specific, actionable tasks. Assign each an Eisenhower quadrant.
+        """
+        let response = try await session.respond(to: prompt, generating: TodoOutput.self)
+        return response.content.todos.map {
+            TodoResult(title: $0.title, notes: $0.notes, quadrant: $0.quadrant)
+        }
     }
 }

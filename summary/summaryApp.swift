@@ -7,6 +7,6 @@ struct summaryApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Thought.self, ThoughtCategory.self, DailySummary.self])
+        .modelContainer(for: [Thought.self, ThoughtCategory.self, DailySummary.self, TodoItem.self])
     }
 }

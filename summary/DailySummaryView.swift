@@ -2,11 +2,13 @@ import SwiftUI
 
 struct DailySummaryView: View {
     @Environment(ThoughtsViewModel.self) private var viewModel
+    @State private var zoomedImage: UIImage?
+    @State private var showImageZoom = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                background
+                SpaceBackground()
 
                 if viewModel.isGeneratingSummary {
                     generatingState(message: "Generating your summary…")
@@ -22,21 +24,11 @@ struct DailySummaryView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
-    }
-
-    // MARK: - Background
-
-    private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.05, green: 0.03, blue: 0.13),
-                Color(red: 0.11, green: 0.05, blue: 0.21),
-                Color(red: 0.05, green: 0.04, blue: 0.17)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
+        .fullScreenCover(isPresented: $showImageZoom) {
+            if let img = zoomedImage {
+                ImageZoomViewer(image: img)
+            }
+        }
     }
 
     // MARK: - Generating state
@@ -46,7 +38,7 @@ struct DailySummaryView: View {
             Spacer()
             ProgressView()
                 .scaleEffect(1.4)
-                .tint(.purple)
+                .tint(.nebula)
             Text(message)
                 .foregroundStyle(.white.opacity(0.55))
                 .font(.subheadline)
@@ -65,7 +57,7 @@ struct DailySummaryView: View {
                     .font(.system(size: 56))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.purple, .indigo.opacity(0.6)],
+                            colors: [.nebula, .cosmicBlue],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         )
                     )
@@ -84,11 +76,9 @@ struct DailySummaryView: View {
                         .padding(.horizontal, 16)
                 }
 
-                ActionButton(
+                CosmicButton(
                     label: "Generate Summary",
                     icon: "sparkles",
-                    colors: [Color(red: 0.55, green: 0.22, blue: 0.92), Color(red: 0.32, green: 0.18, blue: 0.78)],
-                    shadowColor: .purple,
                     disabled: viewModel.todaysThoughts.isEmpty
                 ) {
                     Task { await viewModel.generateDailySummary() }
@@ -114,7 +104,7 @@ struct DailySummaryView: View {
                         Label(summary.date.formatted(date: .abbreviated, time: .omitted),
                               systemImage: "calendar")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.purple.opacity(0.75))
+                            .foregroundStyle(.nebula.opacity(0.85))
                         Spacer()
                         Label("\(summary.thoughtCount) thoughts", systemImage: "brain")
                             .font(.caption)
@@ -154,12 +144,10 @@ struct DailySummaryView: View {
 
                 // ── Bottom actions ──────────────────────────────────────────
                 VStack(spacing: 10) {
-                    ActionButton(
+                    CosmicButton(
                         label: "Regenerate Summary",
                         icon: "arrow.clockwise",
-                        colors: [.white.opacity(0.12), .white.opacity(0.08)],
-                        shadowColor: .clear,
-                        disabled: false
+                        colors: [.white.opacity(0.12), .white.opacity(0.08)]
                     ) {
                         Task { await viewModel.generateDailySummary() }
                     }
@@ -178,16 +166,22 @@ struct DailySummaryView: View {
         if let data = summary.imageData, let uiImage = UIImage(data: data) {
             // Image is ready — show it with a regenerate option
             VStack(spacing: 10) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 240)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .strokeBorder(.white.opacity(0.1), lineWidth: 1)
-                    )
+                Button {
+                    zoomedImage = uiImage
+                    showImageZoom = true
+                } label: {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 240)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .strokeBorder(.white.opacity(0.1), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
 
                 Button {
                     Task { await viewModel.generateImageForCurrentSummary() }
@@ -206,7 +200,7 @@ struct DailySummaryView: View {
                 .frame(height: 200)
                 .overlay(
                     VStack(spacing: 12) {
-                        ProgressView().tint(.purple)
+                        ProgressView().tint(.nebula)
                         Text("Generating image…")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.4))
@@ -217,7 +211,7 @@ struct DailySummaryView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.purple.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(.nebula.opacity(0.2), lineWidth: 1)
                 )
 
         } else {
@@ -228,11 +222,11 @@ struct DailySummaryView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.purple.opacity(0.15))
+                            .fill(Color.nebula.opacity(0.15))
                             .frame(width: 52, height: 52)
                         Image(systemName: "photo.badge.plus")
                             .font(.system(size: 22))
-                            .foregroundStyle(.purple.opacity(0.8))
+                            .foregroundStyle(.nebula.opacity(0.8))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Generate Image")
@@ -304,10 +298,10 @@ struct FlowTagLayout: View {
                     .font(.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.purple.opacity(0.18))
-                    .foregroundStyle(Color.purple.opacity(0.9))
+                    .background(Color.nebula.opacity(0.18))
+                    .foregroundStyle(Color.nebula.opacity(0.9))
                     .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(Color.purple.opacity(0.3), lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(Color.nebula.opacity(0.3), lineWidth: 1))
             }
         }
     }

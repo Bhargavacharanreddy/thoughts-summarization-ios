@@ -84,6 +84,28 @@ class ClaudeService: AIService {
         return try await complete(prompt)
     }
 
+    func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] {
+        let numbered = thoughts.enumerated()
+            .map { "\($0.offset). \($0.element)" }.joined(separator: "\n")
+        let prompt = """
+        Based on these thoughts and their categories, generate an actionable todo list.
+
+        Categories: \(categories.joined(separator: ", "))
+        Thoughts:
+        \(numbered)
+
+        Rules:
+        - Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
+        - Each element: {"title":"Task title","notes":"optional detail or empty string","quadrant":"urgentImportant"}
+        - quadrant must be exactly one of: urgentImportant, notUrgentImportant, urgentNotImportant, notUrgentNotImportant
+        - Generate 3–8 actionable, specific todos derived from the thoughts.
+
+        Example: [{"title":"Call doctor","notes":"","quadrant":"urgentImportant"}]
+        """
+        let response = try await complete(prompt)
+        return try parseTodoJSON(response)
+    }
+
     func cleanTranscript(_ text: String) async throws -> String {
         let prompt = """
         Clean up this voice-to-text transcription. Remove filler words (um, uh, like, you know, so), fix grammar, and make it clear and concise while preserving the original meaning. Return only the cleaned text with no explanation or preamble.
