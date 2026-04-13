@@ -44,6 +44,7 @@ final class DailySummary {
     var date: Date
     var summaryText: String
     var thoughtCount: Int
+    var imageData: Data?
 
     init(date: Date, summaryText: String, thoughtCount: Int) {
         self.id = UUID()

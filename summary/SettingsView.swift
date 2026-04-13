@@ -5,6 +5,13 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ThoughtsViewModel.self) private var viewModel
 
+    @State private var openAITestState: TestState = .idle
+    @State private var claudeTestState: TestState = .idle
+
+    enum TestState: Equatable {
+        case idle, testing, success, failure(String)
+    }
+
     var body: some View {
         @Bindable var settings = viewModel.settings
         NavigationStack {
@@ -41,20 +48,51 @@ struct SettingsView: View {
                 }
 
                 if settings.selectedProvider == .openAI {
-                    Section("OpenAI API Key") {
+                    Section {
                         SecureField("sk-...", text: $settings.openAIKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         apiKeyFeedback(key: settings.openAIKey)
+
+                        // Test button
+                        if !settings.openAIKey.isEmpty {
+                            testRow(
+                                state: openAITestState,
+                                label: "Test OpenAI Connection"
+                            ) {
+                                openAITestState = .testing
+                                let ok = await settings.testOpenAIKey()
+                                openAITestState = ok ? .success : .failure("Invalid key or no quota")
+                            }
+                        }
+                    } header: {
+                        Text("OpenAI API Key")
+                    } footer: {
+                        testFooter(openAITestState, successNote: "Key works. GPT-4o mini, Whisper, and DALL-E 3 are available.")
                     }
                 }
 
                 if settings.selectedProvider == .claude {
-                    Section("Claude API Key") {
+                    Section {
                         SecureField("sk-ant-...", text: $settings.claudeKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         apiKeyFeedback(key: settings.claudeKey)
+
+                        if !settings.claudeKey.isEmpty {
+                            testRow(
+                                state: claudeTestState,
+                                label: "Test Claude Connection"
+                            ) {
+                                claudeTestState = .testing
+                                let ok = await settings.testClaudeKey()
+                                claudeTestState = ok ? .success : .failure("Invalid key or insufficient permissions")
+                            }
+                        }
+                    } header: {
+                        Text("Claude API Key")
+                    } footer: {
+                        testFooter(claudeTestState, successNote: "Key works. Claude Haiku is available.")
                     }
                 }
             }
@@ -67,6 +105,55 @@ struct SettingsView: View {
             }
         }
     }
+
+    // MARK: - Test Row
+
+    @ViewBuilder
+    private func testRow(state: TestState, label: String, action: @escaping () async -> Void) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            HStack {
+                switch state {
+                case .idle:
+                    Label(label, systemImage: "network")
+                        .foregroundStyle(.blue)
+                case .testing:
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Testing…").foregroundStyle(.secondary)
+                    }
+                case .success:
+                    Label("Connected successfully", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .failure(let msg):
+                    Label(msg, systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .disabled(state == .testing)
+    }
+
+    @ViewBuilder
+    private func testFooter(_ state: TestState, successNote: String) -> some View {
+        Group {
+            switch state {
+            case .success:
+                Text(successNote)
+                    .font(.footnote)
+                    .foregroundStyle(.green)
+            case .failure(let msg):
+                Text("⚠️ \(msg). Check that the key is correct and your account has credits.")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            default:
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: - Provider status
 
     private enum ProviderStatus {
         case ready
@@ -158,7 +245,7 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
         } else {
-            Label("API key saved (\(key.prefix(7))...)", systemImage: "checkmark.circle.fill")
+            Label("API key saved (\(key.prefix(7))…)", systemImage: "checkmark.circle.fill")
                 .font(.caption)
                 .foregroundStyle(.green)
         }

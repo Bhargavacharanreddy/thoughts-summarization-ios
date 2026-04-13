@@ -31,14 +31,6 @@ struct DumpView: View {
                 }
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.errorMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil } }
-            )) {
-                Button("OK", role: .cancel) { viewModel.errorMessage = nil }
-            } message: {
-                Text(viewModel.errorMessage ?? "")
-            }
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -172,11 +164,19 @@ struct DumpView: View {
 
     private var thoughtsSection: some View {
         Group {
-            if viewModel.todaysThoughts.isEmpty {
+            if viewModel.todaysThoughts.isEmpty && !viewModel.isCleaningTranscript {
                 emptyState
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
+                        // Cleaning indicator card
+                        if viewModel.isCleaningTranscript {
+                            CleaningCard()
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .scale(scale: 0.85).combined(with: .opacity)
+                                ))
+                        }
                         ForEach(viewModel.todaysThoughts) { thought in
                             ThoughtCard(thought: thought) {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -195,6 +195,7 @@ struct DumpView: View {
                     .padding(.vertical, 12)
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.todaysThoughts.count)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.isCleaningTranscript)
             }
         }
     }
@@ -230,8 +231,13 @@ struct DumpView: View {
 
     private func stopAndSaveVoice() {
         let result = speechRecognizer.stopRecording()
-        if !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            viewModel.addThought(result, inputType: .voice)
+        let audioFileURL = speechRecognizer.lastRecordingFileURL
+        guard !result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            if let url = audioFileURL { try? FileManager.default.removeItem(at: url) }
+            return
+        }
+        Task {
+            await viewModel.cleanAndAddVoiceThought(transcript: result, audioFileURL: audioFileURL)
         }
     }
 }
@@ -401,6 +407,47 @@ struct WaveformBar: View {
                     withAnimation(.easeOut(duration: 0.3)) { barHeight = 3 }
                 }
             }
+    }
+}
+
+// MARK: - Cleaning Card
+
+struct CleaningCard: View {
+    @State private var dots = ""
+    private let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.purple.opacity(0.15))
+                    .frame(width: 40, height: 40)
+                ProgressView()
+                    .tint(.purple)
+                    .scaleEffect(0.8)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Refining voice note\(dots)")
+                    .foregroundStyle(.white.opacity(0.88))
+                    .font(.body)
+                Text("AI is cleaning up your transcription")
+                    .font(.caption2)
+                    .foregroundStyle(.purple.opacity(0.7))
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(.white.opacity(0.055))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(Color.purple.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .onReceive(timer) { _ in
+            dots = dots.count >= 3 ? "" : dots + "."
+        }
     }
 }
 
