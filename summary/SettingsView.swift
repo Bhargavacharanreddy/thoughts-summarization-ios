@@ -96,14 +96,20 @@ struct SettingsView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.spaceBg)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(.nebula)
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - Test Row
