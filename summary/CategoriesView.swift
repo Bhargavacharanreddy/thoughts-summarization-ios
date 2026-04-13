@@ -25,7 +25,7 @@ struct CategoriesView: View {
                     Button {
                         Task { await viewModel.categorize() }
                     } label: {
-                        Label("Categorize", systemImage: "sparkles")
+                        Label("Re-categorize", systemImage: "arrow.clockwise")
                     }
                     .disabled(viewModel.todaysThoughts.isEmpty || viewModel.isCategorizingThoughts)
                 }
@@ -37,7 +37,7 @@ struct CategoriesView: View {
         ContentUnavailableView {
             Label("No Categories Yet", systemImage: "square.grid.2x2")
         } description: {
-            Text("Add thoughts first, then tap the sparkles button to categorize them.")
+            Text("Add thoughts and they'll be automatically categorized after a few seconds.")
         } actions: {
             Button("Categorize Now") {
                 Task { await viewModel.categorize() }

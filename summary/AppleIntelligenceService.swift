@@ -55,4 +55,11 @@ class AppleIntelligenceService: AIService {
         let response = try await session.respond(to: prompt)
         return response.content
     }
+
+    func cleanTranscript(_ text: String) async throws -> String {
+        let session = LanguageModelSession()
+        let prompt = "Clean up this voice-to-text transcription. Remove filler words (um, uh, like, you know, so), fix grammar, and make it clear and concise while preserving the original meaning. Return only the cleaned text with no explanation or preamble.\n\nTranscription: \(text)"
+        let response = try await session.respond(to: prompt)
+        return response.content
+    }
 }

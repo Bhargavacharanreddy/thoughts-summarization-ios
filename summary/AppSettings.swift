@@ -50,4 +50,52 @@ class AppSettings {
     var appleIntelligenceAvailability: SystemLanguageModel.Availability {
         SystemLanguageModel.default.availability
     }
+
+    // MARK: - API Key Verification
+
+    func testOpenAIKey() async -> Bool {
+        guard !openAIKey.isEmpty else { return false }
+        var request = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(openAIKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let messages: [[String: String]] = [["role": "user", "content": "Say ok"]]
+        let body: [String: Any] = [
+            "model": "gpt-4o-mini",
+            "messages": messages,
+            "max_tokens": 5
+        ]
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return false }
+        request.httpBody = httpBody
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        if http.statusCode == 200 { return true }
+        // Check if error is auth-related
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let error = json["error"] as? [String: Any],
+           let errType = error["type"] as? String {
+            return errType != "invalid_request_error" && errType != "authentication_error"
+        }
+        return false
+    }
+
+    func testClaudeKey() async -> Bool {
+        guard !claudeKey.isEmpty else { return false }
+        var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        request.httpMethod = "POST"
+        request.setValue(claudeKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let messages: [[String: String]] = [["role": "user", "content": "Say ok"]]
+        let body: [String: Any] = [
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 5,
+            "messages": messages
+        ]
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: body) else { return false }
+        request.httpBody = httpBody
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else { return false }
+        return http.statusCode == 200
+    }
 }

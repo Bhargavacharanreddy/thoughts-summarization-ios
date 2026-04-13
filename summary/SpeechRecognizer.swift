@@ -10,10 +10,14 @@ class SpeechRecognizer {
 
     var onAutoStop: (() -> Void)?  // called when silence auto-stops recording
 
+    /// URL of the WAV file recorded during the last session. Nil if recording failed or not started.
+    private(set) var lastRecordingFileURL: URL?
+
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
     private let speechRecognizer = SFSpeechRecognizer(locale: .current)
+    private var audioFile: AVAudioFile?
 
     private var silenceTimer: Timer?
     private var hasReceivedSpeech = false
@@ -27,6 +31,7 @@ class SpeechRecognizer {
         do {
             transcript = ""
             hasReceivedSpeech = false
+            lastRecordingFileURL = nil
             silenceTimer?.invalidate()
             silenceTimer = nil
             try beginRecognition()
@@ -36,7 +41,8 @@ class SpeechRecognizer {
         }
     }
 
-    /// Stops recording and returns the final transcript.
+    /// Stops recording and returns the live SFSpeechRecognizer transcript.
+    /// The audio file is available at `lastRecordingFileURL` for Whisper post-processing.
     func stopRecording() -> String {
         silenceTimer?.invalidate()
         silenceTimer = nil
@@ -46,6 +52,7 @@ class SpeechRecognizer {
         recognitionTask?.finish()
         recognitionTask = nil
         recognitionRequest = nil
+        audioFile = nil  // closes and flushes the WAV file
         isRecording = false
         audioLevel = 0
         let result = transcript
@@ -93,8 +100,18 @@ class SpeechRecognizer {
                 userInfo: [NSLocalizedDescriptionKey: "No audio input available. Speech recording requires a microphone (not supported in Simulator)."]
             )
         }
+
+        // Record to a WAV file for Whisper post-processing
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let fileURL = cacheDir.appendingPathComponent("voice_\(Int(Date().timeIntervalSince1970)).wav")
+        if let file = try? AVAudioFile(forWriting: fileURL, settings: format.settings) {
+            audioFile = file
+            lastRecordingFileURL = fileURL
+        }
+
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             request.append(buffer)
+            try? self?.audioFile?.write(from: buffer)
             self?.processAudioLevel(buffer: buffer)
         }
         audioEngine.prepare()

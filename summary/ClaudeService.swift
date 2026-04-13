@@ -11,10 +11,11 @@ class ClaudeService: AIService {
     }
 
     private func complete(_ prompt: String) async throws -> String {
+        let messages: [[String: String]] = [["role": "user", "content": prompt]]
         let body: [String: Any] = [
             "model": model,
             "max_tokens": 1024,
-            "messages": [["role": "user", "content": prompt]]
+            "messages": messages
         ]
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
         request.httpMethod = "POST"
@@ -23,10 +24,27 @@ class ClaudeService: AIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let content = json?["content"] as? [[String: Any]]
-        return content?.first?["text"] as? String ?? ""
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            var apiMsg = "HTTP \(http.statusCode)"
+            if let json = json,
+               let error = json["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                apiMsg = message
+            }
+            throw AIError.unavailable(apiMsg)
+        }
+
+        // Parse Claude response content
+        if let json = json,
+           let content = json["content"] as? [[String: Any]],
+           let firstContent = content.first,
+           let text = firstContent["text"] as? String {
+            return text
+        }
+        throw AIError.parseError
     }
 
     func categorize(thoughts: [String]) async throws -> [CategoryResult] {
@@ -34,9 +52,16 @@ class ClaudeService: AIService {
             .map { "\($0.offset). \($0.element)" }
             .joined(separator: "\n")
         let prompt = """
-        Group these thoughts into meaningful categories.
-        Return ONLY a JSON array, no extra text:
-        [{"name":"Category Name","indices":[0,1,2]},...]
+        Group the following thoughts into meaningful categories.
+
+        Rules:
+        - Return ONLY a raw JSON array. No markdown, no code fences, no explanation.
+        - Each element: {"name":"Category Name","indices":[0,1,2]}
+        - Indices are zero-based integers matching the thought numbers below.
+        - Every thought must appear in exactly one category.
+        - Be concise and fast.
+
+        Example output: [{"name":"Work","indices":[0,2]},{"name":"Health","indices":[1]}]
 
         Thoughts:
         \(numbered)
@@ -55,6 +80,15 @@ class ClaudeService: AIService {
         let prompt = """
         Create a concise daily summary highlighting key themes and insights in 3–5 sentences:
         \(thoughts.joined(separator: "\n"))
+        """
+        return try await complete(prompt)
+    }
+
+    func cleanTranscript(_ text: String) async throws -> String {
+        let prompt = """
+        Clean up this voice-to-text transcription. Remove filler words (um, uh, like, you know, so), fix grammar, and make it clear and concise while preserving the original meaning. Return only the cleaned text with no explanation or preamble.
+
+        Transcription: \(text)
         """
         return try await complete(prompt)
     }
