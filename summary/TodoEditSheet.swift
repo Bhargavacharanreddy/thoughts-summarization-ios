@@ -80,13 +80,6 @@ struct TodoEditSheet: View {
                                 .foregroundStyle(.red.opacity(0.8))
                                 .glassCard(glow: .red)
                         }
-                        .confirmationDialog("Delete this task?", isPresented: $showDeleteConfirm,
-                                            titleVisibility: .visible) {
-                            Button("Delete", role: .destructive) {
-                                viewModel.deleteTodo(todo)
-                                dismiss()
-                            }
-                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -114,6 +107,20 @@ struct TodoEditSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+        .spaceDialog(
+            isPresented: $showDeleteConfirm,
+            icon: "trash.fill",
+            tint: .red,
+            title: "Delete this task?",
+            message: "\"\(todo.title)\" will be removed from your list.",
+            buttons: [
+                SpaceDialogButton(title: "Delete", role: .destructive) {
+                    viewModel.deleteTodo(todo)
+                    dismiss()
+                },
+                .cancel(),
+            ]
+        )
         .onAppear {
             title = todo.title
             notes = todo.notes

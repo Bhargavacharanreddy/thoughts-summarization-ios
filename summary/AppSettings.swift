@@ -69,6 +69,15 @@ class AppSettings {
         }
     }
 
+    /// Where summary images come from with the selected provider, shown under the Generate Image button.
+    var imageSourceDescription: String {
+        switch selectedProvider {
+        case .appleIntelligence: return "Made on your iPhone with Image Playground"
+        case .openAI: return "Made by OpenAI from your summary"
+        case .claude: return "Claude can't make images. Switch to Apple Intelligence or OpenAI."
+        }
+    }
+
     func hasConsented(to provider: AIProvider) -> Bool {
         provider == .appleIntelligence || consentedProviders.contains(provider)
     }

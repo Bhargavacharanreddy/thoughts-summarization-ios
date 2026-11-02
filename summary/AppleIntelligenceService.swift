@@ -140,27 +140,42 @@ class AppleIntelligenceService: AIService {
 
     /// Generates an illustration of the summary on device with Image Playground.
     func generateSummaryImage(summary: String) async throws -> Data? {
-        let creator: ImageCreator
         do {
-            creator = try await ImageCreator()
-        } catch {
-            throw AIError.unavailable("Image Playground isn't available on this device. Turn on Apple Intelligence in Settings.")
-        }
-        let preferred: [ImagePlaygroundStyle] = [.illustration, .animation, .sketch]
-        guard let style = preferred.first(where: creator.availableStyles.contains) else {
-            throw AIError.unavailable("Image Playground has no image styles available yet. Try again later.")
-        }
-
-        do {
+            let creator = try await ImageCreator()
+            let preferred: [ImagePlaygroundStyle] = [.illustration, .animation, .sketch]
+            guard let style = preferred.first(where: creator.availableStyles.contains) else {
+                throw AIError.unavailable(Self.imageMessage("Image Playground's image styles are still downloading. Try again in a few minutes."))
+            }
             let concept = ImagePlaygroundConcept.extracted(from: String(summary.prefix(1_000)), title: "My day")
             for try await image in creator.images(for: [concept], style: style, limit: 1) {
                 return UIImage(cgImage: image.cgImage).pngData()
             }
-            return nil
-        } catch ImageCreator.Error.backgroundCreationForbidden {
-            throw AIError.unavailable("Images can only be created while the app is open.")
-        } catch {
-            throw AIError.unavailable("Image Playground couldn't create an image for this summary.")
+            throw AIError.unavailable(Self.imageMessage("Image Playground didn't return a picture. Tap Regenerate Image to try again."))
+        } catch let error as ImageCreator.Error {
+            throw AIError.unavailable(Self.imageMessage(for: error))
+        }
+    }
+
+    private static func imageMessage(_ detail: String) -> String {
+        "Apple Intelligence makes images on your iPhone with Image Playground. \(detail)"
+    }
+
+    private static func imageMessage(for error: ImageCreator.Error) -> String {
+        switch error {
+        case .notSupported:
+            return imageMessage("This iPhone doesn't support Image Playground. Choose OpenAI in Settings to get images.")
+        case .unavailable:
+            return imageMessage("It isn't ready yet. Turn on Apple Intelligence in Settings → Apple Intelligence & Siri, make sure the Image Playground app is installed, then try again.")
+        case .unsupportedLanguage:
+            return imageMessage("It doesn't support your iPhone's language or region yet.")
+        case .backgroundCreationForbidden:
+            return imageMessage("Keep the app open while the image is being created.")
+        case .conceptsRequirePersonIdentity, .faceInImageTooSmall:
+            return imageMessage("It can't draw this summary because it describes specific people.")
+        case .creationCancelled:
+            return imageMessage("Creating the image was cancelled. Tap Regenerate Image to try again.")
+        default:
+            return imageMessage("It couldn't create a picture for this summary. Tap Regenerate Image to try again.")
         }
     }
 }

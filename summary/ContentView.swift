@@ -5,6 +5,9 @@ struct ContentView: View {
     @State private var settings = AppSettings()
     @State private var viewModel: ThoughtsViewModel?
     @State private var selectedTab = Tab.dump
+    @State private var showError = false
+    @State private var shownError = ""
+    @State private var shownErrorTitle = ""
     private let voiceCapture = VoiceCaptureRequest.shared
 
     enum Tab { case dump, categories, summary, history, tasks }
@@ -35,14 +38,27 @@ struct ContentView: View {
                 .environment(viewModel)
                 .toolbarBackground(Color.spaceBg.opacity(0.95), for: .tabBar)
                 .toolbarColorScheme(.dark, for: .tabBar)
-                .alert("Error", isPresented: Binding(
-                    get: { viewModel.errorMessage != nil },
-                    set: { if !$0 { viewModel.errorMessage = nil } }
-                )) {
-                    Button("OK", role: .cancel) { viewModel.errorMessage = nil }
-                } message: {
-                    Text(viewModel.errorMessage ?? "")
+                .onChange(of: viewModel.errorMessage) { _, message in
+                    if let message {
+                        shownError = message
+                        shownErrorTitle = viewModel.errorTitle ?? "Something Went Wrong"
+                        showError = true
+                    }
                 }
+                .onChange(of: showError) { _, shown in
+                    if !shown {
+                        viewModel.errorMessage = nil
+                        viewModel.errorTitle = nil
+                    }
+                }
+                .spaceDialog(
+                    isPresented: $showError,
+                    icon: "exclamationmark.triangle.fill",
+                    tint: .starGold,
+                    title: shownErrorTitle,
+                    message: shownError,
+                    buttons: [SpaceDialogButton(title: "Got It")]
+                )
             } else {
                 ProgressView()
             }

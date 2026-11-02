@@ -284,7 +284,7 @@ struct HistoryDetailView: View {
                         Text("Generate Image")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.85))
-                        Text("AI creates a visual of this day's thoughts")
+                        Text(viewModel.settings.imageSourceDescription)
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.35))
                     }

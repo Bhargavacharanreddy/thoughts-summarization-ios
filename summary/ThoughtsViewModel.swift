@@ -20,6 +20,8 @@ class ThoughtsViewModel {
     var isCleaningTranscript = false
     var isGeneratingTodos = false
     var errorMessage: String?
+    /// Optional heading for the error dialog; falls back to a generic one.
+    var errorTitle: String?
 
     private let modelContext: ModelContext
     let settings: AppSettings
@@ -200,7 +202,10 @@ class ThoughtsViewModel {
                 try? modelContext.save()
             }
         } catch {
-            if reportErrors { errorMessage = error.localizedDescription }
+            if reportErrors {
+                errorTitle = "Couldn't Create Image"
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

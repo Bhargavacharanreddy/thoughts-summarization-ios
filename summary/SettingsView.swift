@@ -7,8 +7,9 @@ struct SettingsView: View {
 
     @State private var openAITestState: TestState = .idle
     @State private var claudeTestState: TestState = .idle
-    @State private var pendingClear: ClearAction?
-    @State private var completedClear: ClearAction?
+    @State private var pendingClear: ClearAction = .summaries
+    @State private var showClearConfirm = false
+    @State private var showClearDone = false
     @State private var guideProvider: AppSettings.AIProvider?
 
     enum ClearAction: String, Identifiable {
@@ -146,17 +147,17 @@ struct SettingsView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .confirmationDialog(
-            pendingClear?.title ?? "",
-            isPresented: Binding(get: { pendingClear != nil }, set: { if !$0 { pendingClear = nil } }),
-            titleVisibility: .visible,
-            presenting: pendingClear
-        ) { action in
-            Button(action.title, role: .destructive) { performClear(action) }
-            Button("Cancel", role: .cancel) {}
-        } message: { action in
-            Text(action.message)
-        }
+        .spaceDialog(
+            isPresented: $showClearConfirm,
+            icon: "trash.fill",
+            tint: .red,
+            title: "\(pendingClear.title)?",
+            message: pendingClear.message,
+            buttons: [
+                SpaceDialogButton(title: pendingClear.title, role: .destructive) { performClear(pendingClear) },
+                .cancel(),
+            ]
+        )
         .sheet(item: $guideProvider) { provider in
             APIKeyGuideSheet(
                 provider: provider,
@@ -168,15 +169,14 @@ struct SettingsView: View {
                 }
             }
         }
-        .alert(
-            "Deleted",
-            isPresented: Binding(get: { completedClear != nil }, set: { if !$0 { completedClear = nil } }),
-            presenting: completedClear
-        ) { _ in
-            Button("OK", role: .cancel) {}
-        } message: { action in
-            Text(action.doneMessage)
-        }
+        .spaceDialog(
+            isPresented: $showClearDone,
+            icon: "sparkles",
+            tint: .auroraTeal,
+            title: "All Clear",
+            message: pendingClear.doneMessage,
+            buttons: [SpaceDialogButton(title: "Done")]
+        )
     }
 
     // MARK: - Data
@@ -186,6 +186,7 @@ struct SettingsView: View {
             ForEach([ClearAction.summaries, .tasks, .everything]) { action in
                 Button(role: .destructive) {
                     pendingClear = action
+                    showClearConfirm = true
                 } label: {
                     Label(action.title, systemImage: action == .everything ? "trash.fill" : "trash")
                 }
@@ -207,7 +208,7 @@ struct SettingsView: View {
         case .tasks: viewModel.clearTasks()
         case .everything: viewModel.clearEverything()
         }
-        completedClear = action
+        showClearDone = true
     }
 
     // MARK: - Key Guide

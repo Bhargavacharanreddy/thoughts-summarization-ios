@@ -24,7 +24,7 @@ protocol AIService {
 extension AIService {
     func cleanTranscript(_ text: String) async throws -> String { text }
     func generateSummaryImage(summary: String) async throws -> Data? {
-        throw AIError.unavailable("Image generation needs Apple Intelligence or OpenAI. Choose one of them in Settings.")
+        throw AIError.unavailable("Claude can't create images. To get a picture of your day, choose Apple Intelligence (free, on your iPhone) or OpenAI in Settings.")
     }
     func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] { [] }
 }
@@ -37,7 +37,7 @@ enum AIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .parseError: return "Failed to parse AI response."
-        case .unavailable(let reason): return "AI unavailable: \(reason)"
+        case .unavailable(let reason): return reason
         case .noAPIKey: return "API key not configured. Add it in Settings."
         }
     }
