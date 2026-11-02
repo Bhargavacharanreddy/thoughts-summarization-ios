@@ -16,22 +16,8 @@ struct TasksView: View {
                     matrixContent
                 }
             }
-            .navigationTitle("Mission Control")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                if viewModel.isGeneratingTodos {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 6) {
-                            ProgressView().tint(.purple).scaleEffect(0.8)
-                            Text("Generating…")
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.5))
-                        }
-                    }
-                }
-            }
+            .safeAreaInset(edge: .top, spacing: 0) { missionHeader }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showEditSheet) {
@@ -62,53 +48,96 @@ struct TasksView: View {
         .padding(.horizontal, 32)
     }
 
+    // MARK: - Mission Header
+
+    private var activeCount: Int { viewModel.todos.filter { !$0.isDone }.count }
+    private var doneCount: Int { viewModel.todos.count - activeCount }
+    private var progress: Double {
+        viewModel.todos.isEmpty ? 0 : Double(doneCount) / Double(viewModel.todos.count)
+    }
+
+    private var missionHeader: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .stroke(.white.opacity(0.08), lineWidth: 5)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        AngularGradient(colors: [Color.auroraTeal, Color.nebula, Color.starGold, Color.auroraTeal], center: .center),
+                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.spring(response: 0.6, dampingFraction: 0.8), value: progress)
+                Image(systemName: viewModel.isGeneratingTodos ? "sparkles" : "paperplane.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .symbolEffect(.pulse, isActive: viewModel.isGeneratingTodos)
+                    .shadow(color: Color.nebula, radius: 8)
+            }
+            .frame(width: 56, height: 56)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Mission Control")
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(colors: [.white, Color(red: 0.8, green: 0.7, blue: 1.0)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    )
+                    .shadow(color: Color.nebula.opacity(0.6), radius: 10)
+                Group {
+                    if viewModel.isGeneratingTodos {
+                        Text("AI is plotting your tasks…")
+                    } else if viewModel.todos.isEmpty {
+                        Text("Awaiting your first thoughts")
+                    } else {
+                        Text("\(activeCount) active · \(doneCount) done · \(Int(progress * 100))% complete")
+                    }
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.55))
+                .contentTransition(.numericText())
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
+
     // MARK: - Matrix
 
     private var matrixContent: some View {
-        GeometryReader { geo in
-            VStack(spacing: 12) {
-                if viewModel.isGeneratingTodos {
-                    HStack(spacing: 10) {
-                        ProgressView().tint(.purple)
-                        Text("AI is generating your task list…")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.purple.opacity(0.12))
-                }
-
-                let quadrants = EisenhowerQuadrant.allCases
-                let reservedHeight: CGFloat = viewModel.isGeneratingTodos ? 76 : 0
-                let cardHeight = max(180, (geo.size.height - reservedHeight - 12) / 2)
-
-                LazyVGrid(
-                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                    spacing: 12
-                ) {
-                    ForEach(quadrants) { quadrant in
-                        QuadrantCard(
-                            quadrant: quadrant,
-                            todos: viewModel.todos.filter { $0.quadrant == quadrant },
-                            onTap: { todo in
-                                selectedTodo = todo
-                                showEditSheet = true
-                            },
-                            onToggle: { todo in
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.toggleTodoDone(todo)
-                                }
-                            }
-                        )
-                        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // Rows share the available height, so the bottom row never runs under the tab bar.
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                card(.urgentImportant)
+                card(.notUrgentImportant)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
+            HStack(spacing: 12) {
+                card(.urgentNotImportant)
+                card(.notUrgentNotImportant)
+            }
         }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+    }
+
+    private func card(_ quadrant: EisenhowerQuadrant) -> some View {
+        QuadrantCard(
+            quadrant: quadrant,
+            todos: viewModel.todos.filter { $0.quadrant == quadrant },
+            onTap: { todo in
+                selectedTodo = todo
+                showEditSheet = true
+            },
+            onToggle: { todo in
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    viewModel.toggleTodoDone(todo)
+                }
+            }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -126,10 +155,17 @@ struct QuadrantCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: quadrant.icon)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(quadrant.color)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        Circle()
+                            .fill(LinearGradient(colors: [quadrant.color, quadrant.color.opacity(0.5)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .shadow(color: quadrant.color.opacity(0.7), radius: 6)
+                    )
                 VStack(alignment: .leading, spacing: 1) {
                     Text(quadrant.title)
                         .font(.caption.weight(.bold))
@@ -143,10 +179,10 @@ struct QuadrantCard: View {
                 if !todos.isEmpty {
                     Text("\(activeTodos.count)")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(quadrant.color)
-                        .padding(.horizontal, 6)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
                         .padding(.vertical, 2)
-                        .background(quadrant.color.opacity(0.2))
+                        .background(quadrant.color.opacity(0.75))
                         .clipShape(Capsule())
                 }
             }
@@ -161,11 +197,15 @@ struct QuadrantCard: View {
 
             // Todo rows
             if todos.isEmpty {
-                Text("No tasks")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.2))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 16)
+                VStack(spacing: 6) {
+                    Image(systemName: "moon.stars")
+                        .font(.system(size: 18))
+                        .foregroundStyle(quadrant.color.opacity(0.45))
+                    Text("All clear")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.3))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -184,15 +224,25 @@ struct QuadrantCard: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .strokeBorder(quadrant.color.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(colors: [quadrant.color.opacity(0.16), Color.white.opacity(0.03)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
-                .shadow(color: quadrant.color.opacity(0.1), radius: 8)
+                .background(.ultraThinMaterial.opacity(0.4), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(
+                            LinearGradient(colors: [quadrant.color.opacity(0.7), quadrant.color.opacity(0.1)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: 1
+                        )
+                )
+                .shadow(color: quadrant.color.opacity(0.18), radius: 12)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 
