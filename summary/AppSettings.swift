@@ -47,6 +47,28 @@ class AppSettings {
         claudeKey = KeychainStore.string(forKey: "claudeKey") ?? ""
     }
 
+    /// Why `makeAIService()` returns nil for the selected provider, in words the user can act on.
+    var serviceUnavailableMessage: String {
+        switch selectedProvider {
+        case .appleIntelligence:
+            guard case .unavailable(let reason) = SystemLanguageModel.default.availability else {
+                return "Apple Intelligence isn't available right now."
+            }
+            switch reason {
+            case .deviceNotEligible:
+                return "This device doesn't support Apple Intelligence. Choose OpenAI or Claude in Settings."
+            case .appleIntelligenceNotEnabled:
+                return "Turn on Apple Intelligence in the iPhone Settings app, or choose another provider."
+            case .modelNotReady:
+                return "Apple Intelligence is still downloading. Try again in a few minutes."
+            @unknown default:
+                return "Apple Intelligence isn't available right now."
+            }
+        case .openAI, .claude:
+            return AIError.noAPIKey.errorDescription ?? ""
+        }
+    }
+
     func hasConsented(to provider: AIProvider) -> Bool {
         provider == .appleIntelligence || consentedProviders.contains(provider)
     }

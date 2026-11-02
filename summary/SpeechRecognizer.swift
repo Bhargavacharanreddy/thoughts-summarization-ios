@@ -90,6 +90,10 @@ class SpeechRecognizer {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
         request.shouldReportPartialResults = true
+        // Keep audio on the iPhone when the on-device model is available for this language.
+        if speechRecognizer?.supportsOnDeviceRecognition == true {
+            request.requiresOnDeviceRecognition = true
+        }
 
         recognitionTask = speechRecognizer?.recognitionTask(with: request) { [weak self] result, _ in
             if let result {

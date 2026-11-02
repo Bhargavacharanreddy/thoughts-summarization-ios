@@ -24,7 +24,7 @@ protocol AIService {
 extension AIService {
     func cleanTranscript(_ text: String) async throws -> String { text }
     func generateSummaryImage(summary: String) async throws -> Data? {
-        throw AIError.unavailable("Image generation requires OpenAI. Select OpenAI in Settings and add an API key.")
+        throw AIError.unavailable("Image generation needs Apple Intelligence or OpenAI. Choose one of them in Settings.")
     }
     func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] { [] }
 }
