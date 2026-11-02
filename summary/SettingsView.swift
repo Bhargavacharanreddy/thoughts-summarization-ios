@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showClearConfirm = false
     @State private var showClearDone = false
     @State private var guideProvider: AppSettings.AIProvider?
+    @FocusState private var focusedKey: AppSettings.AIProvider?
 
     enum ClearAction: String, Identifiable {
         case summaries, tasks, everything
@@ -48,6 +49,7 @@ struct SettingsView: View {
     var body: some View {
         @Bindable var settings = viewModel.settings
         NavigationStack {
+            ScrollViewReader { proxy in
             Form {
                 Section {
                     providerRow(
@@ -71,9 +73,16 @@ struct SettingsView: View {
                 } header: {
                     Text("AI Provider")
                 } footer: {
-                    Text("Active: \(settings.selectedProvider.rawValue)")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    if settings.needsAPIKey {
+                        Label("\(settings.selectedProvider.rawValue) is selected but needs your API key. Add it below to start using it.",
+                              systemImage: "key.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text("Active: \(settings.selectedProvider.rawValue)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 if settings.selectedProvider == .appleIntelligence {
@@ -82,9 +91,11 @@ struct SettingsView: View {
 
                 if settings.selectedProvider == .openAI {
                     Section {
-                        SecureField("sk-...", text: $settings.openAIKey)
+                        SecureField("Paste your OpenAI key (sk-...)", text: $settings.openAIKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .focused($focusedKey, equals: .openAI)
+                            .listRowBackground(missingKeyHighlight(settings.openAIKey))
                         apiKeyFeedback(key: settings.openAIKey)
                         keyGuideRow(.openAI)
 
@@ -104,13 +115,16 @@ struct SettingsView: View {
                     } footer: {
                         testFooter(openAITestState, successNote: "Key works. GPT-4o mini, Whisper, and DALL-E 3 are available.")
                     }
+                    .id(AppSettings.AIProvider.openAI)
                 }
 
                 if settings.selectedProvider == .claude {
                     Section {
-                        SecureField("sk-ant-...", text: $settings.claudeKey)
+                        SecureField("Paste your Claude key (sk-ant-...)", text: $settings.claudeKey)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .focused($focusedKey, equals: .claude)
+                            .listRowBackground(missingKeyHighlight(settings.claudeKey))
                         apiKeyFeedback(key: settings.claudeKey)
                         keyGuideRow(.claude)
 
@@ -129,9 +143,15 @@ struct SettingsView: View {
                     } footer: {
                         testFooter(claudeTestState, successNote: "Key works. Claude Haiku is available.")
                     }
+                    .id(AppSettings.AIProvider.claude)
                 }
 
                 dataSection
+            }
+            .onChange(of: focusedKey) { _, provider in
+                guard let provider else { return }
+                withAnimation { proxy.scrollTo(provider, anchor: .center) }
+            }
             }
             .scrollContentBackground(.hidden)
             .background(Color.spaceBg)
@@ -158,7 +178,8 @@ struct SettingsView: View {
                 .cancel(),
             ]
         )
-        .sheet(item: $guideProvider) { provider in
+        .task { await focusMissingKey() }
+        .sheet(item: $guideProvider, onDismiss: { Task { await focusMissingKey() } }) { provider in
             APIKeyGuideSheet(
                 provider: provider,
                 alreadyConsented: viewModel.settings.hasConsented(to: provider)
@@ -212,6 +233,23 @@ struct SettingsView: View {
     }
 
     // MARK: - Key Guide
+
+    /// Points the user at the key field when the selected provider still has no key.
+    private func focusMissingKey() async {
+        guard viewModel.settings.needsAPIKey else { return }
+        // Let sheet dismissal / row animation settle so focus and scrolling stick.
+        try? await Task.sleep(for: .milliseconds(450))
+        focusedKey = viewModel.settings.selectedProvider
+    }
+
+    private func missingKeyHighlight(_ key: String) -> some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(key.isEmpty ? Color.orange.opacity(0.12) : Color(.secondarySystemGroupedBackground))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(key.isEmpty ? Color.orange.opacity(0.6) : .clear, lineWidth: 1)
+            )
+    }
 
     private func keyGuideRow(_ provider: AppSettings.AIProvider) -> some View {
         Button {
@@ -303,6 +341,7 @@ struct SettingsView: View {
             withAnimation(.snappy(duration: 0.2)) {
                 settings.selectedProvider = provider
             }
+            Task { await focusMissingKey() }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)

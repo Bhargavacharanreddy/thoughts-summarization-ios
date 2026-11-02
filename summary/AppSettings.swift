@@ -47,6 +47,15 @@ class AppSettings {
         claudeKey = KeychainStore.string(forKey: "claudeKey") ?? ""
     }
 
+    /// True when OpenAI or Claude is selected but its API key hasn't been entered yet.
+    var needsAPIKey: Bool {
+        switch selectedProvider {
+        case .appleIntelligence: return false
+        case .openAI: return openAIKey.isEmpty
+        case .claude: return claudeKey.isEmpty
+        }
+    }
+
     /// Why `makeAIService()` returns nil for the selected provider, in words the user can act on.
     var serviceUnavailableMessage: String {
         switch selectedProvider {
@@ -65,6 +74,9 @@ class AppSettings {
                 return "Apple Intelligence isn't available right now."
             }
         case .openAI, .claude:
+            if needsAPIKey {
+                return "\(selectedProvider.rawValue) is selected but has no API key yet. Tap the gear on the Brain Dump screen to add your key, or switch to Apple Intelligence."
+            }
             return AIError.noAPIKey.errorDescription ?? ""
         }
     }

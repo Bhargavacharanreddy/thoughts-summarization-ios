@@ -62,7 +62,7 @@ struct APIKeyGuideSheet: View {
                 .padding(20)
             }
             .background(Color.spaceBg)
-            .navigationTitle("Get a \(provider.rawValue) Key")
+            .navigationTitle("Get Your \(provider.rawValue) Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .safeAreaInset(edge: .bottom) {
@@ -71,7 +71,7 @@ struct APIKeyGuideSheet: View {
                         onAgree()
                         dismiss()
                     } label: {
-                        Text("Agree & Use \(provider.rawValue)")
+                        Text("Agree & Add My Key")
                             .font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)

@@ -47,12 +47,47 @@ struct DumpView: View {
 
     private var inputSection: some View {
         VStack(spacing: 14) {
+            if viewModel.settings.needsAPIKey {
+                missingKeyBanner
+            }
             inputCard
             controlsRow
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 14)
+    }
+
+    /// Shown when OpenAI or Claude is selected without a key, so AI features don't silently fail.
+    private var missingKeyBanner: some View {
+        Button { showSettings = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Color.orange.opacity(0.85)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add your \(viewModel.settings.selectedProvider.rawValue) API key")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Text("AI features won't work until you add it.")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.orange.opacity(0.12))
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.5), lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var inputCard: some View {
