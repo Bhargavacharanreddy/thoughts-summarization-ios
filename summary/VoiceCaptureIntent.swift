@@ -11,10 +11,10 @@ final class VoiceCaptureRequest {
 }
 
 /// Opens the app straight into voice recording. Assign it to the Action Button via
-/// Settings > Action Button > Shortcut > Summary > "Record a Thought".
+/// Settings > Action Button > Shortcut > Mull > "Record a Thought".
 struct RecordThoughtIntent: AppIntent {
     static let title: LocalizedStringResource = "Record a Thought"
-    static let description = IntentDescription("Opens Summary and starts recording a voice thought.")
+    static let description = IntentDescription("Opens Mull and starts recording a voice thought.")
     static let openAppWhenRun = true
 
     @MainActor
