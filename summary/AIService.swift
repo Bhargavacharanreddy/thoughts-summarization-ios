@@ -23,7 +23,9 @@ protocol AIService {
 
 extension AIService {
     func cleanTranscript(_ text: String) async throws -> String { text }
-    func generateSummaryImage(summary: String) async throws -> Data? { nil }
+    func generateSummaryImage(summary: String) async throws -> Data? {
+        throw AIError.unavailable("Image generation requires OpenAI. Select OpenAI in Settings and add an API key.")
+    }
     func generateTodos(thoughts: [String], categories: [String]) async throws -> [TodoResult] { [] }
 }
 
@@ -44,7 +46,7 @@ enum AIError: Error, LocalizedError {
 // MARK: - Category JSON parser
 
 func parseCategoryJSON(_ json: String, thoughtCount: Int) throws -> [CategoryResult] {
-    var cleaned = stripFences(json)
+    let cleaned = stripFences(json)
 
     guard let startRange = cleaned.range(of: "[{"),
           let endRange = cleaned.range(of: "}]", options: .backwards) else {
@@ -77,7 +79,7 @@ private func parseCategoryArray(_ jsonStr: String, thoughtCount: Int) throws -> 
 // MARK: - Todo JSON parser
 
 func parseTodoJSON(_ json: String) throws -> [TodoResult] {
-    var cleaned = stripFences(json)
+    let cleaned = stripFences(json)
 
     guard let startRange = cleaned.range(of: "[{"),
           let endRange = cleaned.range(of: "}]", options: .backwards) else {

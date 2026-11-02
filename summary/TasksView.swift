@@ -24,7 +24,7 @@ struct TasksView: View {
                 if viewModel.isGeneratingTodos {
                     ToolbarItem(placement: .topBarTrailing) {
                         HStack(spacing: 6) {
-                            ProgressView().tint(.nebula).scaleEffect(0.8)
+                            ProgressView().tint(.purple).scaleEffect(0.8)
                             Text("Generating…")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.5))
@@ -48,7 +48,7 @@ struct TasksView: View {
             Spacer()
             Image(systemName: "checklist.unchecked")
                 .font(.system(size: 64))
-                .foregroundStyle(LinearGradient(colors: [.nebula, .cosmicBlue],
+                .foregroundStyle(LinearGradient(colors: [.purple, .blue],
                                                 startPoint: .top, endPoint: .bottom))
             Text("No Tasks Yet")
                 .font(.title3.weight(.semibold))
@@ -65,26 +65,28 @@ struct TasksView: View {
     // MARK: - Matrix
 
     private var matrixContent: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                // Generating banner
+        GeometryReader { geo in
+            VStack(spacing: 12) {
                 if viewModel.isGeneratingTodos {
                     HStack(spacing: 10) {
-                        ProgressView().tint(.nebula)
+                        ProgressView().tint(.purple)
                         Text("AI is generating your task list…")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.6))
                     }
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.nebula.opacity(0.12))
+                    .background(Color.purple.opacity(0.12))
                 }
 
-                // 2×2 Eisenhower grid
                 let quadrants = EisenhowerQuadrant.allCases
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12),
-                                    GridItem(.flexible(), spacing: 12)],
-                          spacing: 12) {
+                let reservedHeight: CGFloat = viewModel.isGeneratingTodos ? 76 : 0
+                let cardHeight = max(180, (geo.size.height - reservedHeight - 12) / 2)
+
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                    spacing: 12
+                ) {
                     ForEach(quadrants) { quadrant in
                         QuadrantCard(
                             quadrant: quadrant,
@@ -99,11 +101,13 @@ struct TasksView: View {
                                 }
                             }
                         )
+                        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 14)
         }
     }
 }
@@ -163,19 +167,21 @@ struct QuadrantCard: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 16)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(activeTodos) { todo in
-                        TodoRow(todo: todo, accentColor: quadrant.color,
-                                onTap: { onTap(todo) }, onToggle: { onToggle(todo) })
-                    }
-                    if !doneTodos.isEmpty {
-                        ForEach(doneTodos.prefix(2)) { todo in
-                            TodoRow(todo: todo, accentColor: .gray,
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(activeTodos) { todo in
+                            TodoRow(todo: todo, accentColor: quadrant.color,
                                     onTap: { onTap(todo) }, onToggle: { onToggle(todo) })
                         }
+                        if !doneTodos.isEmpty {
+                            ForEach(doneTodos) { todo in
+                                TodoRow(todo: todo, accentColor: .gray,
+                                        onTap: { onTap(todo) }, onToggle: { onToggle(todo) })
+                            }
+                        }
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
             }
         }
         .background(

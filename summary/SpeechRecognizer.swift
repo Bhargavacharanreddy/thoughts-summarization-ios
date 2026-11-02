@@ -1,6 +1,7 @@
 import Speech
 import AVFoundation
 
+@MainActor
 @Observable
 class SpeechRecognizer {
     var transcript = ""
@@ -22,9 +23,11 @@ class SpeechRecognizer {
     private var silenceTimer: Timer?
     private var hasReceivedSpeech = false
     private let silenceDuration: TimeInterval = 2.0
+    private let silenceThreshold: Float = 0.03
 
     // Throttle: update UI every ~3 buffers (~15 fps at 44.1 kHz / 1024 frames)
     private var bufferCount = 0
+    private var hasInstalledTap = false
 
     func startRecording() async {
         guard await requestPermissions() else { return }
@@ -44,10 +47,17 @@ class SpeechRecognizer {
     /// Stops recording and returns the live SFSpeechRecognizer transcript.
     /// The audio file is available at `lastRecordingFileURL` for Whisper post-processing.
     func stopRecording() -> String {
+        guard isRecording else { return "" }
+
         silenceTimer?.invalidate()
         silenceTimer = nil
-        audioEngine.inputNode.removeTap(onBus: 0)
-        audioEngine.stop()
+        if hasInstalledTap {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            hasInstalledTap = false
+        }
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.finish()
         recognitionTask = nil
@@ -114,12 +124,13 @@ class SpeechRecognizer {
             try? self?.audioFile?.write(from: buffer)
             self?.processAudioLevel(buffer: buffer)
         }
+        hasInstalledTap = true
         audioEngine.prepare()
         try audioEngine.start()
     }
 
-    // Called on the audio thread — dispatches to main for all state mutation.
-    private func processAudioLevel(buffer: AVAudioPCMBuffer) {
+    // Called on the audio thread — computes quickly, then updates UI state on main actor.
+    nonisolated private func processAudioLevel(buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData?[0] else { return }
         let frameLength = Int(buffer.frameLength)
 
@@ -129,32 +140,36 @@ class SpeechRecognizer {
         let rms = sqrt(sumSquares / Float(frameLength))
         let normalized = min(rms * 18, 1.0)
 
+        DispatchQueue.main.async { [weak self] in
+            self?.applyAudioLevel(normalized)
+        }
+    }
+
+    private func applyAudioLevel(_ normalized: Float) {
+        guard isRecording else { return }
+
         bufferCount += 1
         let updateUI = bufferCount % 3 == 0  // ~15 fps
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.isRecording else { return }
-
-            // Silence detection — only after first speech received
-            if self.hasReceivedSpeech {
-                if normalized < 0.03 {
-                    if self.silenceTimer == nil {
-                        self.silenceTimer = Timer.scheduledTimer(
-                            withTimeInterval: self.silenceDuration,
-                            repeats: false
-                        ) { [weak self] _ in
-                            self?.onAutoStop?()
-                        }
+        // Silence detection — only after first speech received
+        if hasReceivedSpeech {
+            if normalized < silenceThreshold {
+                if silenceTimer == nil {
+                    silenceTimer = Timer.scheduledTimer(
+                        withTimeInterval: silenceDuration,
+                        repeats: false
+                    ) { [weak self] _ in
+                        self?.onAutoStop?()
                     }
-                } else {
-                    self.silenceTimer?.invalidate()
-                    self.silenceTimer = nil
                 }
+            } else {
+                silenceTimer?.invalidate()
+                silenceTimer = nil
             }
+        }
 
-            if updateUI {
-                self.audioLevel = normalized
-            }
+        if updateUI {
+            audioLevel = normalized
         }
     }
 }

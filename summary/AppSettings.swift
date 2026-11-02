@@ -14,17 +14,41 @@ class AppSettings {
         didSet { UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selectedProvider") }
     }
     var openAIKey: String {
-        didSet { UserDefaults.standard.set(openAIKey, forKey: "openAIKey") }
+        didSet { KeychainStore.set(openAIKey, forKey: "openAIKey") }
     }
     var claudeKey: String {
-        didSet { UserDefaults.standard.set(claudeKey, forKey: "claudeKey") }
+        didSet { KeychainStore.set(claudeKey, forKey: "claudeKey") }
+    }
+    /// Providers the user has agreed to send their thoughts to.
+    var consentedProviders: Set<AIProvider> {
+        didSet { UserDefaults.standard.set(consentedProviders.map(\.rawValue), forKey: "consentedProviders") }
     }
 
     init() {
-        let raw = UserDefaults.standard.string(forKey: "selectedProvider") ?? ""
+        let defaults = UserDefaults.standard
+        let raw = defaults.string(forKey: "selectedProvider") ?? ""
         selectedProvider = AIProvider(rawValue: raw) ?? .appleIntelligence
-        openAIKey = UserDefaults.standard.string(forKey: "openAIKey") ?? ""
-        claudeKey = UserDefaults.standard.string(forKey: "claudeKey") ?? ""
+        var consented = Set((defaults.stringArray(forKey: "consentedProviders") ?? []).compactMap(AIProvider.init(rawValue:)))
+
+        // Move keys saved by older versions out of UserDefaults. Anyone who already entered
+        // a key chose that provider themselves, so treat it as consent.
+        for (key, provider) in [("openAIKey", AIProvider.openAI), ("claudeKey", .claude)] {
+            if let legacy = defaults.string(forKey: key) {
+                if !legacy.isEmpty {
+                    KeychainStore.set(legacy, forKey: key)
+                    consented.insert(provider)
+                }
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.set(consented.map(\.rawValue), forKey: "consentedProviders")
+        consentedProviders = consented
+        openAIKey = KeychainStore.string(forKey: "openAIKey") ?? ""
+        claudeKey = KeychainStore.string(forKey: "claudeKey") ?? ""
+    }
+
+    func hasConsented(to provider: AIProvider) -> Bool {
+        provider == .appleIntelligence || consentedProviders.contains(provider)
     }
 
     func makeAIService() -> (any AIService)? {
@@ -38,10 +62,10 @@ class AppSettings {
             }
             return nil
         case .openAI:
-            guard !openAIKey.isEmpty else { return nil }
+            guard !openAIKey.isEmpty, hasConsented(to: .openAI) else { return nil }
             return OpenAIService(apiKey: openAIKey)
         case .claude:
-            guard !claudeKey.isEmpty else { return nil }
+            guard !claudeKey.isEmpty, hasConsented(to: .claude) else { return nil }
             return ClaudeService(apiKey: claudeKey)
         }
     }

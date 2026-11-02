@@ -28,7 +28,7 @@ struct CategoriesView: View {
                         Task { await viewModel.categorize() }
                     } label: {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundStyle(.nebula)
+                            .foregroundStyle(Color.nebula)
                     }
                     .disabled(viewModel.todaysThoughts.isEmpty || viewModel.isCategorizingThoughts)
                 }
@@ -114,7 +114,7 @@ struct CategoryRow: View {
                     .frame(width: 44, height: 44)
                 Image(systemName: "folder.fill")
                     .font(.system(size: 18))
-                    .foregroundStyle(.nebula)
+                    .foregroundStyle(Color.nebula)
             }
 
             VStack(alignment: .leading, spacing: 4) {

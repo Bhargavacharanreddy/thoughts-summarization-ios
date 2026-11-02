@@ -7,6 +7,8 @@ struct DumpView: View {
     @State private var speechRecognizer = SpeechRecognizer()
     @State private var inputText = ""
     @State private var showSettings = false
+    @Environment(\.scenePhase) private var scenePhase
+    private let voiceCapture = VoiceCaptureRequest.shared
 
     var body: some View {
         NavigationStack {
@@ -35,7 +37,10 @@ struct DumpView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             speechRecognizer.onAutoStop = { stopAndSaveVoice() }
+            handleVoiceCaptureRequest()
         }
+        .onChange(of: voiceCapture.isPending) { handleVoiceCaptureRequest() }
+        .onChange(of: scenePhase) { handleVoiceCaptureRequest() }
     }
 
     // MARK: - Input Section
@@ -95,7 +100,7 @@ struct DumpView: View {
                 TextField("What's on your mind?", text: $inputText, axis: .vertical)
                     .lineLimit(3...6)
                     .foregroundStyle(.white)
-                    .tint(.nebula)
+                    .tint(.purple)
                     .font(.body)
                     .padding(16)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -128,8 +133,8 @@ struct DumpView: View {
                 GradientButton(
                     label: "Add Thought",
                     icon: "plus.circle.fill",
-                    colors: [Color.nebula, Color(red: 0.32, green: 0.18, blue: 0.78)],
-                    shadowColor: .nebula,
+                    colors: [Color.purple, Color(red: 0.32, green: 0.18, blue: 0.78)],
+                    shadowColor: .purple,
                     action: submitText
                 )
                 .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -192,7 +197,7 @@ struct DumpView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.nebula.opacity(0.55), .cosmicBlue.opacity(0.5)],
+                        colors: [.purple.opacity(0.55), .blue.opacity(0.5)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -212,6 +217,19 @@ struct DumpView: View {
         let text = inputText
         withAnimation { inputText = "" }
         viewModel.addThought(text, inputType: .text)
+    }
+
+    /// Handles the Action Button / Shortcut: starts recording, or stops and saves if already recording.
+    /// Waits until the app is active, since the microphone can't start from the background.
+    private func handleVoiceCaptureRequest() {
+        guard voiceCapture.isPending, scenePhase == .active else { return }
+        voiceCapture.isPending = false
+        showSettings = false
+        if speechRecognizer.isRecording {
+            stopAndSaveVoice()
+        } else {
+            Task { await speechRecognizer.startRecording() }
+        }
     }
 
     private func stopAndSaveVoice() {
@@ -263,13 +281,13 @@ struct MicButton: View {
                                     startPoint: .topLeading, endPoint: .bottomTrailing
                                 )
                                 : LinearGradient(
-                                    colors: [Color.nebula, Color(red: 0.32, green: 0.15, blue: 0.76)],
+                                    colors: [Color.purple, Color(red: 0.32, green: 0.15, blue: 0.76)],
                                     startPoint: .topLeading, endPoint: .bottomTrailing
                                 )
                         )
                         .frame(width: 56, height: 56)
                         .shadow(
-                            color: isRecording ? .red.opacity(0.55) : .nebula.opacity(0.45),
+                            color: isRecording ? .red.opacity(0.55) : .purple.opacity(0.45),
                             radius: isRecording ? 16 : 8,
                             y: 4
                         )
@@ -405,10 +423,10 @@ struct CleaningCard: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.nebula.opacity(0.15))
+                    .fill(Color.purple.opacity(0.15))
                     .frame(width: 40, height: 40)
                 ProgressView()
-                    .tint(.nebula)
+                    .tint(.purple)
                     .scaleEffect(0.8)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -417,7 +435,7 @@ struct CleaningCard: View {
                     .font(.body)
                 Text("AI is cleaning up your transcription")
                     .font(.caption2)
-                    .foregroundStyle(.nebula.opacity(0.7))
+                    .foregroundStyle(.purple.opacity(0.7))
             }
             Spacer(minLength: 0)
         }
@@ -427,7 +445,7 @@ struct CleaningCard: View {
                 .fill(.white.opacity(0.055))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)
-                        .strokeBorder(Color.nebula.opacity(0.3), lineWidth: 1)
+                        .strokeBorder(Color.purple.opacity(0.3), lineWidth: 1)
                 )
         )
         .onReceive(timer) { _ in
@@ -445,7 +463,7 @@ struct ThoughtCard: View {
     @State private var appeared = false
 
     private var isVoice: Bool { thought.inputType == .voice }
-    private var accent: Color { isVoice ? .nebula : .auroraTeal }
+    private var accent: Color { isVoice ? .purple : .teal }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {

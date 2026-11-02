@@ -22,6 +22,7 @@ struct DailyHistoryView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear { viewModel.loadHistoricalSummaries() }
+        .onAppear { Task { await viewModel.syncHistory() } }
     }
 
     // MARK: - Empty State
@@ -33,7 +34,7 @@ struct DailyHistoryView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.nebula.opacity(0.55), .indigo.opacity(0.3)],
+                        colors: [.purple.opacity(0.55), .indigo.opacity(0.3)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
@@ -84,10 +85,10 @@ struct HistorySummaryCard: View {
                         .scaledToFill()
                 } else {
                     ZStack {
-                        Color.nebula.opacity(0.12)
+                        Color.purple.opacity(0.12)
                         Image(systemName: "brain.head.profile")
                             .font(.system(size: 28))
-                            .foregroundStyle(.nebula.opacity(0.4))
+                            .foregroundStyle(.purple.opacity(0.4))
                     }
                 }
             }
@@ -97,7 +98,7 @@ struct HistorySummaryCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(summary.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.nebula.opacity(0.8))
+                    .foregroundStyle(.purple.opacity(0.8))
                     .textCase(.uppercase)
                     .tracking(0.5)
 
@@ -146,8 +147,7 @@ struct HistoryDetailView: View {
     let summary: DailySummary
     @Environment(ThoughtsViewModel.self) private var viewModel
     @State private var thoughts: [Thought] = []
-    @State private var zoomedImage: UIImage?
-    @State private var showImageZoom = false
+    @State private var zoomTarget: HistoryZoomTarget?
 
     var body: some View {
         ZStack {
@@ -191,7 +191,7 @@ struct HistoryDetailView: View {
                         ForEach(thoughts) { thought in
                             HStack(alignment: .top, spacing: 10) {
                                 Circle()
-                                    .fill(thought.inputType == .voice ? Color.nebula.opacity(0.5) : Color.cyan.opacity(0.5))
+                                    .fill(thought.inputType == .voice ? Color.purple.opacity(0.5) : Color.cyan.opacity(0.5))
                                     .frame(width: 6, height: 6)
                                     .padding(.top, 6)
                                 Text(thought.content)
@@ -214,10 +214,8 @@ struct HistoryDetailView: View {
         .onAppear {
             thoughts = viewModel.loadThoughts(for: summary.date)
         }
-        .fullScreenCover(isPresented: $showImageZoom) {
-            if let img = zoomedImage {
-                ImageZoomViewer(image: img)
-            }
+        .fullScreenCover(item: $zoomTarget) { target in
+            ImageZoomViewer(image: target.image)
         }
     }
 
@@ -227,8 +225,7 @@ struct HistoryDetailView: View {
             // Image exists
             VStack(spacing: 10) {
                 Button {
-                    zoomedImage = uiImage
-                    showImageZoom = true
+                    zoomTarget = HistoryZoomTarget(image: uiImage)
                 } label: {
                     Image(uiImage: uiImage)
                         .resizable()
@@ -250,16 +247,16 @@ struct HistoryDetailView: View {
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.white.opacity(0.35))
                 }
-                .disabled(viewModel.isGeneratingImage)
+                .disabled(viewModel.isImageGenerating(for: summary))
             }
 
-        } else if viewModel.isGeneratingImage {
+        } else if viewModel.isImageGenerating(for: summary) {
             RoundedRectangle(cornerRadius: 20)
                 .fill(.white.opacity(0.04))
                 .frame(height: 180)
                 .overlay(
                     VStack(spacing: 12) {
-                        ProgressView().tint(.nebula)
+                        ProgressView().tint(.purple)
                         Text("Generating image…")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.4))
@@ -267,7 +264,7 @@ struct HistoryDetailView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.nebula.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(.purple.opacity(0.2), lineWidth: 1)
                 )
         } else {
             // No image — show generate button
@@ -281,7 +278,7 @@ struct HistoryDetailView: View {
                             .frame(width: 52, height: 52)
                         Image(systemName: "photo.badge.plus")
                             .font(.system(size: 22))
-                            .foregroundStyle(.nebula.opacity(0.8))
+                            .foregroundStyle(.purple.opacity(0.8))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Generate Image")
@@ -302,11 +299,16 @@ struct HistoryDetailView: View {
                         .fill(.white.opacity(0.055))
                         .overlay(
                             RoundedRectangle(cornerRadius: 18)
-                                .strokeBorder(.nebula.opacity(0.3), lineWidth: 1)
+                                .strokeBorder(.purple.opacity(0.3), lineWidth: 1)
                         )
                 )
             }
             .buttonStyle(.plain)
         }
     }
+}
+
+private struct HistoryZoomTarget: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }

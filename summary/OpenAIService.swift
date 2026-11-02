@@ -150,18 +150,17 @@ class OpenAIService: AIService {
         return text
     }
 
-    // MARK: - DALL-E
+    // MARK: - Image Generation
 
     func generateSummaryImage(summary: String) async throws -> Data? {
         let truncated = String(summary.prefix(300))
         let prompt = "Abstract, vibrant digital art representing someone's daily thoughts and ideas. Core theme: \(truncated). Style: colorful mind-map aesthetic, dreamy, surreal, thought-provoking, no text."
 
         let body: [String: Any] = [
-            "model": "dall-e-3",
+            "model": "gpt-image-2.5-flare",
             "prompt": prompt,
             "n": 1,
-            "size": "1024x1024",
-            "response_format": "url"
+            "size": "1024x1024"
         ]
 
         var request = URLRequest(url: URL(string: "https://api.openai.com/v1/images/generations")!)
@@ -185,13 +184,21 @@ class OpenAIService: AIService {
 
         guard let json = json,
               let dataArr = json["data"] as? [[String: Any]],
-              let firstItem = dataArr.first,
-              let urlString = firstItem["url"] as? String,
-              let imageURL = URL(string: urlString) else {
-            throw AIError.unavailable("No image returned from DALL-E.")
+              let firstItem = dataArr.first else {
+            throw AIError.unavailable("No image returned from OpenAI.")
         }
 
-        let (imageData, _) = try await URLSession.shared.data(from: imageURL)
-        return imageData
+        if let base64Image = firstItem["b64_json"] as? String,
+           let imageData = Data(base64Encoded: base64Image) {
+            return imageData
+        }
+
+        if let urlString = firstItem["url"] as? String,
+           let imageURL = URL(string: urlString) {
+            let (imageData, _) = try await URLSession.shared.data(from: imageURL)
+            return imageData
+        }
+
+        throw AIError.unavailable("OpenAI did not return a readable image.")
     }
 }

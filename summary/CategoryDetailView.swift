@@ -17,7 +17,7 @@ struct CategoryDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("AI Summary", systemImage: "sparkles")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.nebula)
+                                .foregroundStyle(Color.nebula)
                                 .textCase(.uppercase)
                                 .tracking(0.8)
                             Text(summary)
@@ -39,31 +39,7 @@ struct CategoryDetailView: View {
 
                         VStack(spacing: 8) {
                             ForEach(category.thoughts) { thought in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: thought.inputType == .voice ? "waveform" : "text.bubble")
-                                        .font(.system(size: 13))
-                                        .foregroundStyle(thought.inputType == .voice ? .nebula : .auroraTeal)
-                                        .padding(.top, 2)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(thought.content)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.white.opacity(0.85))
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        Text(thought.timestamp, style: .time)
-                                            .font(.caption2)
-                                            .foregroundStyle(.white.opacity(0.3))
-                                    }
-                                }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(.white.opacity(0.04))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .strokeBorder(.white.opacity(0.07), lineWidth: 1)
-                                        )
-                                )
+                                thoughtRow(thought)
                             }
                         }
                     }
@@ -90,11 +66,42 @@ struct CategoryDetailView: View {
                         ProgressView().tint(.nebula)
                     } else {
                         Label("Summarize", systemImage: "sparkles")
-                            .foregroundStyle(.nebula)
+                            .foregroundStyle(Color.nebula)
                     }
                 }
                 .disabled(isLoadingSummary || category.thoughts.isEmpty)
             }
         }
+    }
+
+    private func thoughtRow(_ thought: Thought) -> some View {
+        let iconName = thought.inputType == .voice ? "waveform" : "text.bubble"
+        let iconColor = thought.inputType == .voice ? Color.nebula : Color.auroraTeal
+
+        return HStack(alignment: .top, spacing: 10) {
+            Image(systemName: iconName)
+                .font(.system(size: 13))
+                .foregroundStyle(iconColor)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(thought.content)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(thought.timestamp, style: .time)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.3))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.white.opacity(0.07), lineWidth: 1)
+                )
+        )
     }
 }

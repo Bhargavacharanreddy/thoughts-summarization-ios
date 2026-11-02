@@ -49,34 +49,7 @@ struct TodoEditSheet: View {
                                     Button {
                                         withAnimation(.snappy) { quadrant = q }
                                     } label: {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: q.icon)
-                                                .font(.system(size: 16))
-                                                .foregroundStyle(q.color)
-                                                .frame(width: 24)
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(q.title)
-                                                    .font(.subheadline.weight(.semibold))
-                                                    .foregroundStyle(.white.opacity(0.9))
-                                                Text(q.subtitle)
-                                                    .font(.caption2)
-                                                    .foregroundStyle(.white.opacity(0.4))
-                                            }
-                                            Spacer()
-                                            if quadrant == q {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundStyle(q.color)
-                                            }
-                                        }
-                                        .padding(12)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(quadrant == q ? q.color.opacity(0.15) : Color.white.opacity(0.04))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 12)
-                                                        .strokeBorder(quadrant == q ? q.color.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 1)
-                                                )
-                                        )
+                                        quadrantRow(for: q)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -87,7 +60,7 @@ struct TodoEditSheet: View {
                         Toggle(isOn: $isDone) {
                             HStack(spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.auroraTeal)
+                                    .foregroundStyle(Color.auroraTeal)
                                 Text("Mark as Done")
                                     .foregroundStyle(.white.opacity(0.85))
                             }
@@ -135,7 +108,7 @@ struct TodoEditSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .foregroundStyle(.nebula)
+                    .foregroundStyle(Color.nebula)
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -155,5 +128,38 @@ struct TodoEditSheet: View {
             .foregroundStyle(.white.opacity(0.4))
             .textCase(.uppercase)
             .tracking(1)
+    }
+
+    private func quadrantRow(for q: EisenhowerQuadrant) -> some View {
+        let isSelected = quadrant == q
+
+        return HStack(spacing: 12) {
+            Image(systemName: q.icon)
+                .font(.system(size: 16))
+                .foregroundStyle(q.color)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(q.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                Text(q.subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(q.color)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isSelected ? q.color.opacity(0.15) : Color.white.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(isSelected ? q.color.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+        )
     }
 }

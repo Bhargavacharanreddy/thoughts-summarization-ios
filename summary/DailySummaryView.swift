@@ -2,8 +2,7 @@ import SwiftUI
 
 struct DailySummaryView: View {
     @Environment(ThoughtsViewModel.self) private var viewModel
-    @State private var zoomedImage: UIImage?
-    @State private var showImageZoom = false
+    @State private var zoomTarget: ZoomTarget?
 
     var body: some View {
         NavigationStack {
@@ -24,10 +23,8 @@ struct DailySummaryView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
         }
         .preferredColorScheme(.dark)
-        .fullScreenCover(isPresented: $showImageZoom) {
-            if let img = zoomedImage {
-                ImageZoomViewer(image: img)
-            }
+        .fullScreenCover(item: $zoomTarget) { target in
+            ImageZoomViewer(image: target.image)
         }
     }
 
@@ -38,7 +35,7 @@ struct DailySummaryView: View {
             Spacer()
             ProgressView()
                 .scaleEffect(1.4)
-                .tint(.nebula)
+                .tint(.purple)
             Text(message)
                 .foregroundStyle(.white.opacity(0.55))
                 .font(.subheadline)
@@ -57,7 +54,7 @@ struct DailySummaryView: View {
                     .font(.system(size: 56))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.nebula, .cosmicBlue],
+                            colors: [.purple, .blue],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         )
                     )
@@ -104,7 +101,7 @@ struct DailySummaryView: View {
                         Label(summary.date.formatted(date: .abbreviated, time: .omitted),
                               systemImage: "calendar")
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(.nebula.opacity(0.85))
+                            .foregroundStyle(.purple.opacity(0.85))
                         Spacer()
                         Label("\(summary.thoughtCount) thoughts", systemImage: "brain")
                             .font(.caption)
@@ -167,8 +164,7 @@ struct DailySummaryView: View {
             // Image is ready — show it with a regenerate option
             VStack(spacing: 10) {
                 Button {
-                    zoomedImage = uiImage
-                    showImageZoom = true
+                    zoomTarget = ZoomTarget(image: uiImage)
                 } label: {
                     Image(uiImage: uiImage)
                         .resizable()
@@ -200,7 +196,7 @@ struct DailySummaryView: View {
                 .frame(height: 200)
                 .overlay(
                     VStack(spacing: 12) {
-                        ProgressView().tint(.nebula)
+                        ProgressView().tint(.purple)
                         Text("Generating image…")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.4))
@@ -211,7 +207,7 @@ struct DailySummaryView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.nebula.opacity(0.2), lineWidth: 1)
+                        .strokeBorder(.purple.opacity(0.2), lineWidth: 1)
                 )
 
         } else {
@@ -222,11 +218,11 @@ struct DailySummaryView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.nebula.opacity(0.15))
+                            .fill(Color.purple.opacity(0.15))
                             .frame(width: 52, height: 52)
                         Image(systemName: "photo.badge.plus")
                             .font(.system(size: 22))
-                            .foregroundStyle(.nebula.opacity(0.8))
+                            .foregroundStyle(.purple.opacity(0.8))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Generate Image")
@@ -254,6 +250,11 @@ struct DailySummaryView: View {
             .buttonStyle(.plain)
         }
     }
+}
+
+private struct ZoomTarget: Identifiable {
+    let id = UUID()
+    let image: UIImage
 }
 
 // MARK: - Reusable action button
@@ -298,10 +299,10 @@ struct FlowTagLayout: View {
                     .font(.caption)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.nebula.opacity(0.18))
-                    .foregroundStyle(Color.nebula.opacity(0.9))
+                    .background(Color.purple.opacity(0.18))
+                    .foregroundStyle(Color.purple.opacity(0.9))
                     .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(Color.nebula.opacity(0.3), lineWidth: 1))
+                    .overlay(Capsule().strokeBorder(Color.purple.opacity(0.3), lineWidth: 1))
             }
         }
     }

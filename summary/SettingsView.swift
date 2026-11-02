@@ -7,6 +7,38 @@ struct SettingsView: View {
 
     @State private var openAITestState: TestState = .idle
     @State private var claudeTestState: TestState = .idle
+    @State private var pendingClear: ClearAction?
+    @State private var completedClear: ClearAction?
+    @State private var guideProvider: AppSettings.AIProvider?
+
+    enum ClearAction: String, Identifiable {
+        case summaries, tasks, everything
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .summaries: return "Clear Summaries & History"
+            case .tasks: return "Clear Tasks"
+            case .everything: return "Clear Everything"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .summaries: return "Deletes all thoughts, categories, daily summaries and their images. This can't be undone."
+            case .tasks: return "Deletes all tasks. This can't be undone."
+            case .everything: return "Deletes all thoughts, categories, summaries, images and tasks. Your AI provider and API keys are kept. This can't be undone."
+            }
+        }
+
+        var doneMessage: String {
+            switch self {
+            case .summaries: return "All summaries, history and thoughts have been deleted."
+            case .tasks: return "All tasks have been deleted."
+            case .everything: return "All your data has been deleted. Your AI provider and API keys are still set."
+            }
+        }
+    }
 
     enum TestState: Equatable {
         case idle, testing, success, failure(String)
@@ -53,6 +85,7 @@ struct SettingsView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         apiKeyFeedback(key: settings.openAIKey)
+                        keyGuideRow(.openAI)
 
                         // Test button
                         if !settings.openAIKey.isEmpty {
@@ -78,6 +111,7 @@ struct SettingsView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         apiKeyFeedback(key: settings.claudeKey)
+                        keyGuideRow(.claude)
 
                         if !settings.claudeKey.isEmpty {
                             testRow(
@@ -95,6 +129,8 @@ struct SettingsView: View {
                         testFooter(claudeTestState, successNote: "Key works. Claude Haiku is available.")
                     }
                 }
+
+                dataSection
             }
             .scrollContentBackground(.hidden)
             .background(Color.spaceBg)
@@ -105,11 +141,84 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(.nebula)
+                        .foregroundStyle(Color.nebula)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .confirmationDialog(
+            pendingClear?.title ?? "",
+            isPresented: Binding(get: { pendingClear != nil }, set: { if !$0 { pendingClear = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingClear
+        ) { action in
+            Button(action.title, role: .destructive) { performClear(action) }
+            Button("Cancel", role: .cancel) {}
+        } message: { action in
+            Text(action.message)
+        }
+        .sheet(item: $guideProvider) { provider in
+            APIKeyGuideSheet(
+                provider: provider,
+                alreadyConsented: viewModel.settings.hasConsented(to: provider)
+            ) {
+                withAnimation(.snappy(duration: 0.2)) {
+                    viewModel.settings.consentedProviders.insert(provider)
+                    viewModel.settings.selectedProvider = provider
+                }
+            }
+        }
+        .alert(
+            "Deleted",
+            isPresented: Binding(get: { completedClear != nil }, set: { if !$0 { completedClear = nil } }),
+            presenting: completedClear
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { action in
+            Text(action.doneMessage)
+        }
+    }
+
+    // MARK: - Data
+
+    private var dataSection: some View {
+        Section {
+            ForEach([ClearAction.summaries, .tasks, .everything]) { action in
+                Button(role: .destructive) {
+                    pendingClear = action
+                } label: {
+                    Label(action.title, systemImage: action == .everything ? "trash.fill" : "trash")
+                }
+            }
+            .disabled(viewModel.isBusy)
+        } header: {
+            Text("Data")
+        } footer: {
+            if viewModel.isBusy {
+                Text("Wait for the current AI task to finish before clearing data.")
+                    .font(.footnote)
+            }
+        }
+    }
+
+    private func performClear(_ action: ClearAction) {
+        switch action {
+        case .summaries: viewModel.clearSummariesAndHistory()
+        case .tasks: viewModel.clearTasks()
+        case .everything: viewModel.clearEverything()
+        }
+        completedClear = action
+    }
+
+    // MARK: - Key Guide
+
+    private func keyGuideRow(_ provider: AppSettings.AIProvider) -> some View {
+        Button {
+            guideProvider = provider
+        } label: {
+            Label("How to get an API key", systemImage: "questionmark.circle")
+                .foregroundStyle(Color.nebula)
+        }
     }
 
     // MARK: - Test Row
@@ -186,6 +295,10 @@ struct SettingsView: View {
 
     private func providerRow(provider: AppSettings.AIProvider, icon: String, status: ProviderStatus, settings: AppSettings) -> some View {
         Button {
+            guard settings.hasConsented(to: provider) else {
+                guideProvider = provider
+                return
+            }
             withAnimation(.snappy(duration: 0.2)) {
                 settings.selectedProvider = provider
             }

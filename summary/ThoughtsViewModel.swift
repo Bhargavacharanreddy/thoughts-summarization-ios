@@ -12,7 +12,11 @@ class ThoughtsViewModel {
 
     var isCategorizingThoughts = false
     var isGeneratingSummary = false
-    var isGeneratingImage = false
+    var generatingImageIDs: Set<UUID> = []
+    var isGeneratingImage: Bool {
+        dailySummary.map { generatingImageIDs.contains($0.id) } ?? false
+    }
+    var isSyncingHistory = false
     var isCleaningTranscript = false
     var isGeneratingTodos = false
     var errorMessage: String?
@@ -20,6 +24,9 @@ class ThoughtsViewModel {
     private let modelContext: ModelContext
     let settings: AppSettings
     private var autoCategorizationTask: Task<Void, Never>?
+
+    /// How many recent days History keeps summaries and images in sync for.
+    private let historySyncDays = 7
 
     init(modelContext: ModelContext, settings: AppSettings) {
         self.modelContext = modelContext
@@ -132,15 +139,12 @@ class ThoughtsViewModel {
         isGeneratingSummary = true
         defer { isGeneratingSummary = false }
 
-        let contents = todaysThoughts.map { $0.content }
         do {
-            let text = try await service.dailySummary(thoughts: contents)
             let today = Calendar.current.startOfDay(for: Date())
-            if let existing = dailySummary { modelContext.delete(existing) }
-            let summary = DailySummary(date: today, summaryText: text, thoughtCount: contents.count)
-            modelContext.insert(summary)
+            let summary = try await upsertSummary(for: today, thoughts: todaysThoughts, existing: dailySummary, service: service)
             dailySummary = summary
-            try? modelContext.save()
+            loadHistoricalSummaries()
+            await generateImage(for: summary, service: service)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -156,8 +160,17 @@ class ThoughtsViewModel {
             errorMessage = AIError.noAPIKey.errorDescription
             return
         }
-        isGeneratingImage = true
-        defer { isGeneratingImage = false }
+        await generateImage(for: summary, service: service)
+    }
+
+    func isImageGenerating(for summary: DailySummary) -> Bool {
+        generatingImageIDs.contains(summary.id)
+    }
+
+    private func generateImage(for summary: DailySummary, service: any AIService) async {
+        guard !generatingImageIDs.contains(summary.id) else { return }
+        generatingImageIDs.insert(summary.id)
+        defer { generatingImageIDs.remove(summary.id) }
 
         do {
             if let imageData = try await service.generateSummaryImage(summary: summary.summaryText) {
@@ -167,6 +180,23 @@ class ThoughtsViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Creates or refreshes the summary for `date` in place, clearing a stale image.
+    private func upsertSummary(for date: Date, thoughts: [Thought], existing: DailySummary?, service: any AIService) async throws -> DailySummary {
+        let text = try await service.dailySummary(thoughts: thoughts.map { $0.content })
+        let summary: DailySummary
+        if let existing {
+            summary = existing
+            summary.summaryText = text
+            summary.thoughtCount = thoughts.count
+            summary.imageData = nil
+        } else {
+            summary = DailySummary(date: date, summaryText: text, thoughtCount: thoughts.count)
+            modelContext.insert(summary)
+        }
+        try? modelContext.save()
+        return summary
     }
 
     func summarizeCategory(_ category: ThoughtCategory) async -> String? {
@@ -217,12 +247,91 @@ class ThoughtsViewModel {
     // MARK: - History
 
     func loadHistoricalSummaries() {
-        let today = Calendar.current.startOfDay(for: Date())
         let desc = FetchDescriptor<DailySummary>(
-            predicate: #Predicate { $0.date < today },
             sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         historicalSummaries = (try? modelContext.fetch(desc)) ?? []
+    }
+
+    /// Brings recent days up to date: creates missing summaries, refreshes ones whose
+    /// thoughts changed since they were generated, and fills in missing images.
+    func syncHistory() async {
+        guard !isSyncingHistory, let service = settings.makeAIService() else { return }
+        isSyncingHistory = true
+        defer { isSyncingHistory = false }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        for offset in 0..<historySyncDays {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let thoughts = loadThoughts(for: day)
+            let existing = summary(for: day)
+
+            var target = existing
+            if !thoughts.isEmpty, existing == nil || existing?.thoughtCount != thoughts.count {
+                do {
+                    target = try await upsertSummary(for: day, thoughts: thoughts, existing: existing, service: service)
+                    if offset == 0 { dailySummary = target }
+                    loadHistoricalSummaries()
+                } catch {
+                    errorMessage = error.localizedDescription
+                    return
+                }
+            }
+
+            if let target, target.imageData == nil {
+                await generateImage(for: target, service: service)
+            }
+        }
+    }
+
+    private func summary(for date: Date) -> DailySummary? {
+        let start = Calendar.current.startOfDay(for: date)
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        let desc = FetchDescriptor<DailySummary>(
+            predicate: #Predicate { $0.date >= start && $0.date < end }
+        )
+        return try? modelContext.fetch(desc).first
+    }
+
+    // MARK: - Clearing Data
+
+    /// True while an AI task is writing data, when clearing could race with it.
+    var isBusy: Bool {
+        isSyncingHistory || isGeneratingSummary || isCategorizingThoughts
+            || isGeneratingTodos || isCleaningTranscript || !generatingImageIDs.isEmpty
+    }
+
+    /// Deletes all summaries along with the thoughts and categories they were built from,
+    /// so History has nothing to rebuild them from.
+    func clearSummariesAndHistory() {
+        autoCategorizationTask?.cancel()
+        deleteAll(DailySummary.self)
+        deleteAll(Thought.self)
+        deleteAll(ThoughtCategory.self)
+        try? modelContext.save()
+
+        todaysThoughts = []
+        categories = []
+        dailySummary = nil
+        historicalSummaries = []
+    }
+
+    func clearTasks() {
+        deleteAll(TodoItem.self)
+        try? modelContext.save()
+        todos = []
+    }
+
+    func clearEverything() {
+        clearSummariesAndHistory()
+        clearTasks()
+    }
+
+    private func deleteAll<T: PersistentModel>(_ type: T.Type) {
+        let items = (try? modelContext.fetch(FetchDescriptor<T>())) ?? []
+        for item in items { modelContext.delete(item) }
     }
 
     func loadThoughts(for date: Date) -> [Thought] {

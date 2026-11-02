@@ -20,6 +20,7 @@ struct ImageZoomViewer: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
+                    .frame(width: geo.size.width, height: geo.size.height)
                     .scaleEffect(scale)
                     .offset(offset)
                     .gesture(
