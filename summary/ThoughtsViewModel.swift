@@ -144,7 +144,9 @@ class ThoughtsViewModel {
             let summary = try await upsertSummary(for: today, thoughts: todaysThoughts, existing: dailySummary, service: service)
             dailySummary = summary
             loadHistoricalSummaries()
-            await generateImage(for: summary, service: service)
+            if canAutoGenerateImages {
+                await generateImage(for: summary, service: service)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -161,6 +163,12 @@ class ThoughtsViewModel {
             return
         }
         await generateImage(for: summary, service: service)
+    }
+
+    /// Only OpenAI can make images; other providers throw, so automatic generation skips them
+    /// instead of showing an error. Tapping Generate Image still reports it.
+    private var canAutoGenerateImages: Bool {
+        settings.selectedProvider == .openAI
     }
 
     func isImageGenerating(for summary: DailySummary) -> Bool {
@@ -280,7 +288,7 @@ class ThoughtsViewModel {
                 }
             }
 
-            if let target, target.imageData == nil {
+            if canAutoGenerateImages, let target, target.imageData == nil {
                 await generateImage(for: target, service: service)
             }
         }
